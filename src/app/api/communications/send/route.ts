@@ -18,8 +18,49 @@ function readSecret(envName: string) {
   return normalized ? process.env[normalized] ?? "" : "";
 }
 
+function readEnvString(name: string, fallback: string) {
+  return process.env[name]?.trim() || fallback;
+}
+
+function readEnvNumber(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function readEnvBoolean(name: string, fallback: boolean) {
+  const value = process.env[name]?.trim().toLowerCase();
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  return fallback;
+}
+
+function resolveSmtpSettings(settings: CommunicationSendInput["settings"]) {
+  const smtpHost = readEnvString("SMTP_HOST", settings.smtpHost);
+  const smtpSecurity = readEnvString("SMTP_SECURITY", settings.smtpSecurity);
+  const smtpSecure = readEnvBoolean("SMTP_SECURE", smtpSecurity === "ssl-tls" || settings.smtpSecure);
+  return {
+    emailProvider: readEnvString("EMAIL_PROVIDER", smtpHost && settings.emailProvider === "none" ? "smtp-imap" : settings.emailProvider),
+    emailMode: readEnvString("EMAIL_MODE", settings.emailMode),
+    smtpHost,
+    smtpPort: readEnvNumber("SMTP_PORT", settings.smtpPort),
+    smtpSecurity,
+    smtpSecure,
+    smtpRequireTls: readEnvBoolean("SMTP_REQUIRE_TLS", smtpSecurity === "starttls" || settings.smtpRequireTls),
+    smtpFromName: readEnvString("SMTP_FROM_NAME", settings.smtpFromName),
+    smtpFromEmail: readEnvString("SMTP_FROM_EMAIL", settings.smtpFromEmail),
+    smtpReplyToEmail: readEnvString("SMTP_REPLY_TO_EMAIL", settings.smtpReplyToEmail),
+    smtpAuthMethod: readEnvString("SMTP_AUTH_METHOD", settings.smtpAuthMethod),
+    smtpUsernameEnv: settings.smtpUsernameEnv,
+    smtpPasswordEnv: settings.smtpPasswordEnv,
+  };
+}
+
 async function sendEmail(input: CommunicationSendInput) {
-  const { settings } = input;
+  const settings = resolveSmtpSettings(input.settings);
   if (settings.emailProvider === "none" || !settings.smtpHost || !settings.smtpFromEmail) {
     return fallbackResponse(input, "SMTP is not fully configured yet.");
   }

@@ -28,10 +28,30 @@ services:
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       AUTH_SECRET: ${AUTH_SECRET:-docker-dev-change-this-secret-before-production}
       INTERNAL_USERS_JSON: '[{"id":"owner","email":"owner@sunsetcountry.tech","name":"Owner","role":"Owner","passwordHash":"$$2b$$12$$AaTOUWJQBb1KpyNpA0uOlurGrPr43.67hJpHCFI/vUx734nNy.1.i"}]'
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-none}
+      EMAIL_MODE: ${EMAIL_MODE:-outbound-only}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_REQUIRE_TLS: ${SMTP_REQUIRE_TLS:-true}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Sunset Country Tech}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-hello@sunsetcountry.tech}
+      SMTP_REPLY_TO_EMAIL: ${SMTP_REPLY_TO_EMAIL:-hello@sunsetcountry.tech}
+      SMTP_AUTH_METHOD: ${SMTP_AUTH_METHOD:-login}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      IMAP_ENABLED: ${IMAP_ENABLED:-false}
+      IMAP_HOST: ${IMAP_HOST:-}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      IMAP_SECURITY: ${IMAP_SECURITY:-ssl-tls}
+      IMAP_SECURE: ${IMAP_SECURE:-true}
       IMAP_USERNAME: ${IMAP_USERNAME:-}
       IMAP_PASSWORD: ${IMAP_PASSWORD:-}
+      IMAP_INBOX_MAILBOX: ${IMAP_INBOX_MAILBOX:-INBOX}
+      IMAP_PROCESSED_MAILBOX: ${IMAP_PROCESSED_MAILBOX:-Processed}
+      IMAP_ERROR_MAILBOX: ${IMAP_ERROR_MAILBOX:-Needs Review}
+      IMAP_POLLING_MINUTES: ${IMAP_POLLING_MINUTES:-5}
       SMS_API_KEY: ${SMS_API_KEY:-}
       SMS_WEBHOOK_SECRET: ${SMS_WEBHOOK_SECRET:-}
       CALENDAR_API_KEY: ${CALENDAR_API_KEY:-}

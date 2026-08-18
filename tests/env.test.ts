@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { mailConnectionEnvNames } from "../src/lib/communications";
 import { defaultSettings } from "../src/lib/operations-data";
 
 const rootEnvNames = [
@@ -29,15 +30,15 @@ const settingEnvNames = [
 test(".env.example documents every runtime and settings-backed env var", () => {
   const envExample = readFileSync(".env.example", "utf8");
 
-  for (const name of [...rootEnvNames, ...settingEnvNames]) {
+  for (const name of [...rootEnvNames, ...mailConnectionEnvNames, ...settingEnvNames]) {
     assert.match(envExample, new RegExp(`^${name}=`, "m"), `${name} is missing from .env.example`);
   }
 });
 
-test("docker compose passes every settings-backed secret env var into the app container", () => {
+test("docker compose passes every mail setting env var into the app container", () => {
   const compose = readFileSync("docker-compose.yml", "utf8");
 
-  for (const name of settingEnvNames) {
-    assert.match(compose, new RegExp(`${name}: \\$\\{${name}:-\\}`), `${name} is missing from docker-compose.yml`);
+  for (const name of [...mailConnectionEnvNames, ...settingEnvNames]) {
+    assert.match(compose, new RegExp(`${name}: \\$\\{${name}:-`), `${name} is missing from docker-compose.yml`);
   }
 });

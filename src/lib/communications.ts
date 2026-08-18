@@ -10,6 +10,7 @@ export const communicationSendSchema = z.object({
   body: trimmedString.min(1).max(4000),
   settings: z.object({
     emailProvider: trimmedString.default("none"),
+    emailMode: trimmedString.default("outbound-only"),
     smtpHost: trimmedString.default(""),
     smtpPort: z.number().int().min(1).max(65535).default(587),
     smtpSecurity: trimmedString.default("starttls"),
@@ -29,6 +30,29 @@ export const communicationSendSchema = z.object({
 });
 
 export type CommunicationSendInput = z.infer<typeof communicationSendSchema>;
+
+export const mailConnectionEnvNames = [
+  "EMAIL_PROVIDER",
+  "EMAIL_MODE",
+  "SMTP_HOST",
+  "SMTP_PORT",
+  "SMTP_SECURITY",
+  "SMTP_SECURE",
+  "SMTP_REQUIRE_TLS",
+  "SMTP_FROM_NAME",
+  "SMTP_FROM_EMAIL",
+  "SMTP_REPLY_TO_EMAIL",
+  "SMTP_AUTH_METHOD",
+  "IMAP_ENABLED",
+  "IMAP_HOST",
+  "IMAP_PORT",
+  "IMAP_SECURITY",
+  "IMAP_SECURE",
+  "IMAP_INBOX_MAILBOX",
+  "IMAP_PROCESSED_MAILBOX",
+  "IMAP_ERROR_MAILBOX",
+  "IMAP_POLLING_MINUTES",
+] as const;
 
 export function buildMailtoUrl(to: string, subject: string, body: string) {
   const query = new URLSearchParams();
