@@ -27,8 +27,16 @@ export async function POST(request: Request) {
     returnTo: safeReturnTo(formData.get("returnTo")),
   });
 
-  if (!parsed.success || !sameOriginRequest(request) || !(await verifyCsrfToken(parsed.data.csrfToken, getAuthSecret()))) {
-    return relativeRedirect("/login?error=1");
+  if (!parsed.success) {
+    return relativeRedirect("/login?error=invalid");
+  }
+
+  if (!sameOriginRequest(request)) {
+    return relativeRedirect("/login?error=origin");
+  }
+
+  if (!(await verifyCsrfToken(parsed.data.csrfToken, getAuthSecret()))) {
+    return relativeRedirect("/login?error=csrf");
   }
 
   const attemptKey = `${request.headers.get("x-forwarded-for") ?? "local"}:${parsed.data.email}`;
@@ -38,7 +46,7 @@ export async function POST(request: Request) {
 
   const user = await verifyStaffCredentials(parsed.data.email, parsed.data.password);
   if (!user) {
-    return relativeRedirect(`/login?error=1&returnTo=${encodeURIComponent(parsed.data.returnTo)}`);
+    return relativeRedirect(`/login?error=credentials&returnTo=${encodeURIComponent(parsed.data.returnTo)}`);
   }
 
   attempts.delete(attemptKey);

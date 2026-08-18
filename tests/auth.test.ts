@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createSessionId, getAuthSecret, signCsrfToken, signSession, verifyCsrfToken, verifySession } from "../src/lib/auth-cookie";
+import { POST as loginPost } from "../src/app/api/auth/login/route";
 import { safeReturnTo, verifyStaffCredentials } from "../src/lib/server/auth";
 import { allowedRequestOrigins, sameOriginRequest } from "../src/lib/server/http";
 
@@ -62,4 +63,17 @@ test("login origin check still rejects unknown origins", () => {
 
   assert.equal(sameOriginRequest(request), false);
   restoreEnv("NEXT_PUBLIC_SITE_URL", previous);
+});
+
+test("login route reports credential failures distinctly", async () => {
+  const formData = new FormData();
+  formData.set("email", "owner@sunsetcountry.tech");
+  formData.set("password", "bad-password");
+  formData.set("csrfToken", await signCsrfToken(getAuthSecret()));
+  formData.set("returnTo", "/");
+
+  const response = await loginPost(new Request("http://localhost/api/auth/login", { method: "POST", body: formData }));
+
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get("location"), "/login?error=credentials&returnTo=%2F");
 });

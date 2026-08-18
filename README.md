@@ -43,6 +43,12 @@ Docker Compose includes a local Postgres database and runs Prisma migrations on 
 - Email: `owner@sunsetcountry.tech`
 - Password: `sunset-demo-2026`
 
+To use your own staff password in Docker, set `INTERNAL_USERS_JSON` in `.env`. Compose passes that value into the app container when present. Generate the bcrypt hash with:
+
+```bash
+npm run auth:hash-password -- "your-password"
+```
+
 For production Docker deployments, override at least:
 
 - `AUTH_SECRET`

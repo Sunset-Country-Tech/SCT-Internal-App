@@ -52,3 +52,9 @@ test("docker compose app uses the bundled database service", () => {
   assert.match(compose, /\$\$\{POSTGRES_USER\}/);
   assert.match(compose, /\$\$\{POSTGRES_DB\}/);
 });
+
+test("docker compose allows staff users to be overridden from env", () => {
+  const compose = readFileSync("docker-compose.yml", "utf8");
+
+  assert.match(compose, /INTERNAL_USERS_JSON: \$\{INTERNAL_USERS_JSON:-/);
+});

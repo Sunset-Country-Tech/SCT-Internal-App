@@ -8,6 +8,15 @@ export default async function LoginPage(props: PageProps<"/login">) {
   const error = searchParams.error;
   const returnTo = typeof searchParams.returnTo === "string" ? searchParams.returnTo : "/";
   const csrfToken = await signCsrfToken(getAuthSecret());
+  const errorMessage = error === "origin"
+    ? "Sign-in failed because the domain origin is not trusted by this deployment."
+    : error === "csrf"
+      ? "Sign-in failed because the page security token expired. Refresh and try again."
+      : error === "rate"
+        ? "Too many sign-in attempts. Wait a minute and try again."
+        : error
+          ? "Sign-in failed. Check your staff email and password."
+          : "";
 
   return (
     <main className="grid min-h-screen place-items-center bg-[#0d1220] px-4">
@@ -19,7 +28,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
             <p className="text-sm text-slate-600">Internal operations sign-in</p>
           </div>
         </div>
-        {error ? <p className="mt-5 rounded-[8px] bg-red-50 p-3 text-sm font-bold text-red-700">Sign-in failed. Check your staff email and password.</p> : null}
+        {errorMessage ? <p className="mt-5 rounded-[8px] bg-red-50 p-3 text-sm font-bold text-red-700">{errorMessage}</p> : null}
         <form action="/api/auth/login" method="post" className="mt-6 space-y-4">
           <input type="hidden" name="returnTo" value={returnTo} />
           <input type="hidden" name="csrfToken" value={csrfToken} />
