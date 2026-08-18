@@ -2,7 +2,7 @@
 
 import { Plus, Save, Trash2, X } from "lucide-react";
 import { useState } from "react";
-import { normalizeSettings, type AppSettings, roles } from "@/lib/operations-data";
+import { normalizeSettings, type AppSettings, type CommunicationTemplate, roles } from "@/lib/operations-data";
 import { can, type Role } from "@/lib/workflows";
 
 type Props = {
@@ -70,6 +70,64 @@ function ListEditor({
             <button disabled={disabled} type="button" onClick={() => onChange(value.filter((candidate) => candidate !== item))} aria-label={`Remove ${item}`} className="text-slate-400 hover:text-red-600 disabled:hidden"><X className="h-3 w-3" /></button>
           </span>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function TemplateEditor({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: CommunicationTemplate[];
+  disabled: boolean;
+  onChange: (value: CommunicationTemplate[]) => void;
+}) {
+  const [draft, setDraft] = useState<CommunicationTemplate>({
+    id: "custom-template",
+    name: "",
+    channel: "email",
+    subject: "",
+    body: "",
+  });
+
+  function updateTemplate(id: string, patch: Partial<CommunicationTemplate>) {
+    onChange(value.map((template) => template.id === id ? { ...template, ...patch } : template));
+  }
+
+  function addTemplate() {
+    const name = draft.name.trim();
+    const body = draft.body.trim();
+    if (!name || !body) {
+      return;
+    }
+    const baseId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "custom-template";
+    const id = value.some((template) => template.id === baseId) ? `${baseId}-${value.length + 1}` : baseId;
+    onChange([...value, { ...draft, id, name, body }]);
+    setDraft({ id: "custom-template", name: "", channel: "email", subject: "", body: "" });
+  }
+
+  return (
+    <div className="rounded-[8px] border border-slate-200 p-4 md:col-span-2">
+      <p className="font-black">Communication templates</p>
+      <div className="mt-4 grid gap-3">
+        {value.map((template) => (
+          <div key={template.id} className="grid gap-3 rounded-[8px] border border-slate-200 p-3 md:grid-cols-4">
+            <Field label="Name"><Input disabled={disabled} value={template.name} onChange={(event) => updateTemplate(template.id, { name: event.target.value })} /></Field>
+            <Field label="Channel"><Select disabled={disabled} value={template.channel} onChange={(event) => updateTemplate(template.id, { channel: event.target.value === "sms" ? "sms" : "email" })}><option value="email">Email</option><option value="sms">SMS</option></Select></Field>
+            <div className="md:col-span-2"><Field label="Subject"><Input disabled={disabled || template.channel === "sms"} value={template.subject} onChange={(event) => updateTemplate(template.id, { subject: event.target.value })} /></Field></div>
+            <div className="md:col-span-4"><Field label="Body"><TextArea disabled={disabled} value={template.body} onChange={(event) => updateTemplate(template.id, { body: event.target.value })} /></Field></div>
+            <div className="md:col-span-4 flex justify-end"><button disabled={disabled} type="button" onClick={() => onChange(value.filter((candidate) => candidate.id !== template.id))} className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-slate-200 px-3 text-xs font-black text-red-600 disabled:opacity-40"><Trash2 className="h-4 w-4" /> Delete</button></div>
+          </div>
+        ))}
+        <div className="grid gap-3 rounded-[8px] bg-slate-50 p-3 md:grid-cols-4">
+          <Field label="New template"><Input disabled={disabled} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Follow-up" /></Field>
+          <Field label="Channel"><Select disabled={disabled} value={draft.channel} onChange={(event) => setDraft({ ...draft, channel: event.target.value === "sms" ? "sms" : "email", subject: event.target.value === "sms" ? "" : draft.subject })}><option value="email">Email</option><option value="sms">SMS</option></Select></Field>
+          <div className="md:col-span-2"><Field label="Subject"><Input disabled={disabled || draft.channel === "sms"} value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })} placeholder="Update for {customer}" /></Field></div>
+          <div className="md:col-span-4"><Field label="Body"><TextArea disabled={disabled} value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })} placeholder="Hi {customer},&#10;&#10;Thanks from {business}." /></Field></div>
+          <div className="md:col-span-4 flex justify-end"><button disabled={disabled || !draft.name.trim() || !draft.body.trim()} type="button" onClick={addTemplate} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#ff8a00] px-4 text-sm font-black text-[#0d1220] disabled:opacity-40"><Plus className="h-4 w-4" /> Add Template</button></div>
+        </div>
       </div>
     </div>
   );
@@ -183,6 +241,8 @@ export function SettingsPanel({ role, settings, onChange }: Props) {
                 ) : null}
               </div>
             </div>
+
+            <TemplateEditor value={settings.communicationTemplates} disabled={!canWrite} onChange={(value) => set("communicationTemplates", value)} />
 
             <div className="rounded-[8px] border border-slate-200 p-4 md:col-span-2">
               <p className="font-black">SMTP outbound mail</p>

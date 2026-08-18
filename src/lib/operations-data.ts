@@ -35,6 +35,14 @@ export const navItems = [
   { label: "Settings", icon: Settings },
 ] as const;
 
+export type CommunicationTemplate = {
+  id: string;
+  name: string;
+  channel: "email" | "sms";
+  subject: string;
+  body: string;
+};
+
 export type AppSettings = {
   businessName: string;
   abn: string;
@@ -103,7 +111,32 @@ export type AppSettings = {
   r2Bucket: string;
   r2AccessKeyEnv: string;
   r2SecretKeyEnv: string;
+  communicationTemplates: CommunicationTemplate[];
 };
+
+export const defaultCommunicationTemplates: CommunicationTemplate[] = [
+  {
+    id: "job-update",
+    name: "Job update",
+    channel: "email",
+    subject: "Update from {business}",
+    body: "Hi {customer},\n\nA quick update from {business}: your job is progressing and we will let you know as soon as the next step is ready.\n\nThanks,",
+  },
+  {
+    id: "appointment-reminder",
+    name: "Appointment reminder",
+    channel: "sms",
+    subject: "",
+    body: "Hi {customer}, this is a reminder from {business} about your upcoming appointment. Reply here if you need to change anything.",
+  },
+  {
+    id: "ready-for-collection",
+    name: "Ready for collection",
+    channel: "email",
+    subject: "Your device is ready",
+    body: "Hi {customer},\n\nYour device is ready for collection from {business}. Please reply if you would like to arrange a pickup time.\n\nThanks,",
+  },
+];
 
 export const defaultSettings: AppSettings = {
   businessName: "Sunset Country Tech",
@@ -173,6 +206,7 @@ export const defaultSettings: AppSettings = {
   r2Bucket: "sunset-country-tech-files",
   r2AccessKeyEnv: "R2_ACCESS_KEY_ID",
   r2SecretKeyEnv: "R2_SECRET_ACCESS_KEY",
+  communicationTemplates: defaultCommunicationTemplates,
 };
 
 export function normalizeSettings(value: unknown): AppSettings {
@@ -185,6 +219,20 @@ export function normalizeSettings(value: unknown): AppSettings {
   const booleanOrDefault = (candidate: unknown, fallback: boolean) => (typeof candidate === "boolean" ? candidate : fallback);
   const smtpSecurity = typeof partial.smtpSecurity === "string" ? partial.smtpSecurity : defaultSettings.smtpSecurity;
   const imapSecurity = typeof partial.imapSecurity === "string" ? partial.imapSecurity : defaultSettings.imapSecurity;
+  const communicationTemplates = Array.isArray(partial.communicationTemplates)
+    ? partial.communicationTemplates.flatMap((template) => {
+      if (!template || typeof template !== "object") {
+        return [];
+      }
+      const candidate = template as Partial<CommunicationTemplate>;
+      const name = typeof candidate.name === "string" ? candidate.name.trim() : "";
+      const id = typeof candidate.id === "string" && candidate.id.trim() ? candidate.id.trim() : `template-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "custom"}`;
+      const channel: CommunicationTemplate["channel"] = candidate.channel === "sms" ? "sms" : "email";
+      const subject = typeof candidate.subject === "string" ? candidate.subject : "";
+      const body = typeof candidate.body === "string" ? candidate.body : "";
+      return name && body ? [{ id, name, channel, subject, body }] : [];
+    })
+    : defaultSettings.communicationTemplates;
 
   return {
     ...defaultSettings,
@@ -193,6 +241,7 @@ export function normalizeSettings(value: unknown): AppSettings {
     jobStatuses: Array.isArray(partial.jobStatuses) ? partial.jobStatuses : defaultSettings.jobStatuses,
     jobTypes: Array.isArray(partial.jobTypes) ? partial.jobTypes : defaultSettings.jobTypes,
     tags: Array.isArray(partial.tags) ? partial.tags : defaultSettings.tags,
+    communicationTemplates,
     numbering: {
       ...defaultSettings.numbering,
       ...(partial.numbering && typeof partial.numbering === "object" ? partial.numbering : {}),

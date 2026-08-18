@@ -104,6 +104,13 @@ export function buildEmailHtml(body: string, signature: string, signatureImageUr
   return `<div>${paragraphs}${image}</div>`;
 }
 
+export function renderCommunicationTemplate(value: string, context: Record<string, string | number | undefined>) {
+  return value.replace(/\{([a-zA-Z0-9_-]+)\}/g, (match, key: string) => {
+    const replacement = context[key.toLowerCase()];
+    return replacement === undefined ? match : String(replacement);
+  });
+}
+
 export function contactTargetFor(channel: "email" | "sms", customer: { email?: string; phone?: string } | undefined) {
   if (!customer) {
     return "";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendEmailSignature, buildEmailHtml, buildMailtoUrl, buildSmsUrl, contactTargetFor } from "../src/lib/communications";
+import { appendEmailSignature, buildEmailHtml, buildMailtoUrl, buildSmsUrl, contactTargetFor, renderCommunicationTemplate } from "../src/lib/communications";
 
 test("email fallback URL preserves address, subject, and body", () => {
   const url = buildMailtoUrl("customer@example.test", "Repair update", "Your laptop is ready.");
@@ -32,4 +32,13 @@ test("email HTML includes escaped body text and optional image signature", () =>
   assert.match(html, /Ready &lt;today&gt;/);
   assert.match(html, /Kind regards,<br>SCT/);
   assert.match(html, /<img src="https:\/\/cdn.example\/signature.png" alt="SCT signature"/);
+});
+
+test("communication templates render known placeholders and leave unknown ones intact", () => {
+  const rendered = renderCommunicationTemplate("Hi {customer}, {business} is ready. {unknown}", {
+    customer: "Mia",
+    business: "Sunset Country Tech",
+  });
+
+  assert.equal(rendered, "Hi Mia, Sunset Country Tech is ready. {unknown}");
 });

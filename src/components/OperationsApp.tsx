@@ -4,7 +4,7 @@ import { AlertTriangle, Bell, CalendarPlus, CheckCircle2, CreditCard, FilePlus2,
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SettingsPanel } from "@/components/SettingsPanel";
-import { contactTargetFor } from "@/lib/communications";
+import { contactTargetFor, renderCommunicationTemplate } from "@/lib/communications";
 import {
   alerts,
   appointments as seedAppointments,
@@ -46,7 +46,7 @@ type InvoiceRecord = (typeof seedInvoices)[number];
 type AppointmentRecord = (typeof seedAppointments)[number];
 type ModalMode = "job" | "customer" | "quote" | "appointment" | "payment" | "workflow" | "communication" | null;
 type ActivityRecord = { id: string; title: string; detail: string; createdAt: string };
-type CommunicationDraft = { customer: string; channel: "email" | "sms"; to: string; subject: string; body: string };
+type CommunicationDraft = { customer: string; channel: "email" | "sms"; to: string; subject: string; body: string; templateId: string };
 type CommunicationRecord = CommunicationDraft & { id: string; status: string; fallbackUrl?: string; createdAt: string };
 type OperationsData = {
   customers: CustomerRecord[];
@@ -113,6 +113,7 @@ export function OperationsApp({ user }: Props) {
     to: seedCustomers[0]?.email ?? "",
     subject: "Update from Sunset Country Tech",
     body: "",
+    templateId: "",
   });
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
 
@@ -218,6 +219,7 @@ export function OperationsApp({ user }: Props) {
       to: contactTargetFor(channel, customer),
       subject: "Update from Sunset Country Tech",
       body: "",
+      templateId: "",
     });
     setAlertsOpen(false);
     setModal("communication");
@@ -237,6 +239,39 @@ export function OperationsApp({ user }: Props) {
       ...draft,
       channel,
       to: contactTargetFor(channel, selectedCommunicationCustomer),
+      subject: channel === "sms" ? "" : draft.subject,
+      templateId: "",
+    }));
+  }
+
+  function communicationTemplateContext(customerName = communicationDraft.customer) {
+    const customer = customerRecords.find((record) => record.name === customerName);
+    return {
+      customer: customer?.name ?? customerName,
+      phone: customer?.phone ?? "",
+      email: customer?.email ?? "",
+      area: customer?.area ?? "",
+      business: settings.businessName,
+      website: settings.website,
+      businessphone: settings.phone,
+      businessemail: settings.email,
+    };
+  }
+
+  function applyCommunicationTemplate(templateId: string) {
+    const template = settings.communicationTemplates.find((item) => item.id === templateId);
+    if (!template) {
+      setCommunicationDraft((draft) => ({ ...draft, templateId: "" }));
+      return;
+    }
+    const context = communicationTemplateContext();
+    setCommunicationDraft((draft) => ({
+      ...draft,
+      templateId,
+      channel: template.channel,
+      to: contactTargetFor(template.channel, selectedCommunicationCustomer),
+      subject: template.channel === "email" ? renderCommunicationTemplate(template.subject, context) : "",
+      body: renderCommunicationTemplate(template.body, context),
     }));
   }
 
@@ -391,6 +426,7 @@ export function OperationsApp({ user }: Props) {
       to: String(formData.get("to") ?? "").trim(),
       subject: String(formData.get("subject") ?? "").trim(),
       body: String(formData.get("body") ?? "").trim(),
+      templateId: String(formData.get("templateId") ?? "").trim(),
     };
     if (!draft.customer || !draft.to || !draft.body) {
       showNotice("Choose a customer, target, and message.");
@@ -580,6 +616,7 @@ export function OperationsApp({ user }: Props) {
             {modal === "communication" ? <>
               <Field label="Customer"><Select name="customer" value={communicationDraft.customer} onChange={(event) => updateCommunicationCustomer(event.target.value)}>{customerRecords.map((customer) => <option key={customer.id}>{customer.name}</option>)}</Select></Field>
               <Field label="Channel"><Select name="channel" value={communicationDraft.channel} onChange={(event) => updateCommunicationChannel(event.target.value === "sms" ? "sms" : "email")}><option value="email">Email</option><option value="sms">SMS</option></Select></Field>
+              <div className="md:col-span-2"><Field label="Template"><Select name="templateId" value={communicationDraft.templateId} onChange={(event) => applyCommunicationTemplate(event.target.value)}><option value="">Blank message</option>{settings.communicationTemplates.filter((template) => template.channel === communicationDraft.channel).map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</Select></Field></div>
               <Field label={communicationDraft.channel === "email" ? "Email address" : "Phone number"}><Input name="to" value={communicationDraft.to} onChange={(event) => setCommunicationDraft((draft) => ({ ...draft, to: event.target.value }))} required /></Field>
               {communicationDraft.channel === "email" ? <Field label="Subject"><Input name="subject" value={communicationDraft.subject} onChange={(event) => setCommunicationDraft((draft) => ({ ...draft, subject: event.target.value }))} /></Field> : <input name="subject" type="hidden" value="" />}
               <div className="md:col-span-2"><Field label="Message"><TextArea name="body" value={communicationDraft.body} onChange={(event) => setCommunicationDraft((draft) => ({ ...draft, body: event.target.value }))} required placeholder="Write the customer update..." /></Field></div>

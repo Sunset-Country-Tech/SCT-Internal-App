@@ -19,6 +19,7 @@ test("saved settings from older app versions are upgraded with integration defau
   assert.match(settings.emailSignature, /Sunset Country Tech/);
   assert.equal(settings.emailSignatureImageUrl, "");
   assert.equal(settings.emailSignatureImageAlt, "Sunset Country Tech");
+  assert.ok(settings.communicationTemplates.length >= 3);
   assert.equal(settings.imapEnabled, false);
   assert.equal(settings.imapHost, "");
   assert.equal(settings.imapPort, 993);
@@ -56,4 +57,17 @@ test("mail settings normalize saved SMTP and IMAP values", () => {
   assert.equal(settings.imapSecurity, "starttls");
   assert.equal(settings.imapSecure, false);
   assert.equal(settings.imapPollingMinutes, 10);
+});
+
+test("communication templates normalize custom saved values", () => {
+  const settings = normalizeSettings({
+    communicationTemplates: [
+      { name: "Pickup", channel: "sms", body: "Hi {customer}, your device is ready." },
+      { id: "bad", name: "", channel: "email", body: "" },
+    ],
+  });
+
+  assert.deepEqual(settings.communicationTemplates, [
+    { id: "template-pickup", name: "Pickup", channel: "sms", subject: "", body: "Hi {customer}, your device is ready." },
+  ]);
 });
