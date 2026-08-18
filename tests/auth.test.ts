@@ -51,6 +51,19 @@ test("single staff env tolerates a pasted base64 assignment", async () => {
   restoreEnv("STAFF_PASSWORD_HASH_B64", previousHash);
 });
 
+test("single staff env tolerates quoted base64 values", async () => {
+  const previousEmail = process.env.STAFF_EMAIL;
+  const previousHash = process.env.STAFF_PASSWORD_HASH_B64;
+  process.env.STAFF_EMAIL = "admin@example.test";
+  process.env.STAFF_PASSWORD_HASH_B64 = `"${Buffer.from("$2b$12$AaTOUWJQBb1KpyNpA0uOlurGrPr43.67hJpHCFI/vUx734nNy.1.i", "utf8").toString("base64")}"`;
+
+  const user = await verifyStaffCredentials("admin@example.test", "sunset-demo-2026");
+
+  assert.equal(user?.email, "admin@example.test");
+  restoreEnv("STAFF_EMAIL", previousEmail);
+  restoreEnv("STAFF_PASSWORD_HASH_B64", previousHash);
+});
+
 test("single staff env accepts raw bcrypt hash when supplied", async () => {
   const previousEmail = process.env.STAFF_EMAIL;
   const previousHash = process.env.STAFF_PASSWORD_HASH;

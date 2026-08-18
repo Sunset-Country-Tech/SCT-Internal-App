@@ -30,7 +30,11 @@ const devOwner: StaffUser = {
 };
 
 function stripEnvAssignment(value: string) {
-  return value.replace(/^STAFF_PASSWORD_HASH_B64=/, "").replace(/^STAFF_PASSWORD_HASH=/, "").trim();
+  return value
+    .replace(/^STAFF_PASSWORD_HASH_B64=/, "")
+    .replace(/^STAFF_PASSWORD_HASH=/, "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
 }
 
 function decodeBase64(value: string) {

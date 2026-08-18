@@ -12,7 +12,11 @@ const bcrypt = await import("bcryptjs").catch(() => {
 });
 
 function stripEnvAssignment(value) {
-  return value.replace(/^STAFF_PASSWORD_HASH_B64=/, "").replace(/^STAFF_PASSWORD_HASH=/, "").trim();
+  return value
+    .replace(/^STAFF_PASSWORD_HASH_B64=/, "")
+    .replace(/^STAFF_PASSWORD_HASH=/, "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
 }
 
 function normalizeHash(value) {
