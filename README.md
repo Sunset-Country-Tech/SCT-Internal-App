@@ -86,6 +86,7 @@ Set:
 - `AUTH_SECRET`
 - `DATABASE_URL`
 - `INTERNAL_USERS_JSON`
+- `PUBLIC_INTAKE_SECRET` for public website contact form forwarding.
 - SMTP secrets such as `SMTP_USERNAME` and `SMTP_PASSWORD` if SMTP is enabled.
 - IMAP secrets such as `IMAP_USERNAME` and `IMAP_PASSWORD` if inbound mail intake is enabled.
 - SMS secrets such as `SMS_API_KEY` and `SMS_WEBHOOK_SECRET` if SMS is enabled.
@@ -93,6 +94,61 @@ Set:
 - Storage secrets such as `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` if R2/S3 storage is enabled.
 
 The Settings page stores provider choices, SMTP/IMAP hosts and ports, TLS modes, mailbox names, sender details, bucket names and the names of secret environment variables. It does not store secret values in browser storage.
+
+## Public Website Contact Intake
+
+The internal app exposes `POST /api/public-contact-intake` for the public website to forward contact form submissions. Requests must be `multipart/form-data` and include:
+
+- Header: `x-sct-public-intake-secret: <shared secret>`
+- Fields: `name`, `email`, `phone`, `suburb`, `service`, `message`, `device`, `preferredSupport`, `companyWebsite`
+- Files: `photos`, up to 4 PNG/JPEG/WebP files, maximum 5MB each
+
+The honeypot field `companyWebsite` must be empty. Valid `service` values are:
+
+```text
+Computer Repair, Computer Upgrade, PC Build, Home Tech Support, Digital Literacy,
+Wi-Fi / Networking, Printer, Security Cameras, Smart Home, Business IT,
+3D Printing, Remote Support, Other
+```
+
+Valid `preferredSupport` values are:
+
+```text
+On-site, Remote, Collection/drop-off, Not sure
+```
+
+Public website environment variables:
+
+```bash
+SCT_INTERNAL_INTAKE_URL="https://internal.example.com/api/public-contact-intake"
+SCT_PUBLIC_INTAKE_SECRET="same-value-as-internal-PUBLIC_INTAKE_SECRET"
+```
+
+Forwarding format from the public website:
+
+```ts
+const upstream = await fetch(process.env.SCT_INTERNAL_INTAKE_URL!, {
+  method: "POST",
+  headers: {
+    "x-sct-public-intake-secret": process.env.SCT_PUBLIC_INTAKE_SECRET!,
+  },
+  body: formData,
+});
+```
+
+The endpoint returns only:
+
+```json
+{ "ok": true, "intakeId": "...", "jobId": "..." }
+```
+
+or:
+
+```json
+{ "ok": false, "message": "..." }
+```
+
+Uploaded photo metadata is recorded on the intake job. Persisting uploaded photo files is intentionally marked as a TODO until the file storage backend is implemented.
 
 Generate a staff password hash:
 

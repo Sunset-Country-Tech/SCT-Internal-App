@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { AUTH_COOKIE, getAuthSecret, verifySession } from "@/lib/auth-cookie";
 import { relativeRedirect } from "@/lib/server/http";
 
-const publicPrefixes = ["/login", "/q", "/api/auth", "/api/quotes", "/_next", "/favicon.ico"];
+const publicPrefixes = ["/login", "/q", "/api/auth", "/api/quotes", "/api/public-contact-intake", "/_next", "/favicon.ico"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
