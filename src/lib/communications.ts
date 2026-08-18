@@ -20,6 +20,8 @@ export const communicationSendSchema = z.object({
     smtpFromEmail: trimmedString.default(""),
     smtpReplyToEmail: trimmedString.default(""),
     emailSignature: trimmedString.default(""),
+    emailSignatureImageUrl: trimmedString.default(""),
+    emailSignatureImageAlt: trimmedString.default("Email signature"),
     smtpAuthMethod: trimmedString.default("login"),
     smtpUsernameEnv: trimmedString.default("SMTP_USERNAME"),
     smtpPasswordEnv: trimmedString.default("SMTP_PASSWORD"),
@@ -44,6 +46,8 @@ export const mailConnectionEnvNames = [
   "SMTP_FROM_EMAIL",
   "SMTP_REPLY_TO_EMAIL",
   "EMAIL_SIGNATURE",
+  "EMAIL_SIGNATURE_IMAGE_URL",
+  "EMAIL_SIGNATURE_IMAGE_ALT",
   "SMTP_AUTH_METHOD",
   "IMAP_ENABLED",
   "IMAP_HOST",
@@ -77,6 +81,27 @@ export function appendEmailSignature(body: string, signature: string) {
     return trimmedBody;
   }
   return `${trimmedBody}\n\n${trimmedSignature}`;
+}
+
+export function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+export function buildEmailHtml(body: string, signature: string, signatureImageUrl: string, signatureImageAlt: string) {
+  const paragraphs = appendEmailSignature(body, signature)
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replaceAll("\n", "<br>")}</p>`)
+    .join("");
+  const imageUrl = signatureImageUrl.trim();
+  const image = imageUrl
+    ? `<p><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(signatureImageAlt || "Email signature")}" style="max-width:560px;width:100%;height:auto;display:block;border:0;"></p>`
+    : "";
+  return `<div>${paragraphs}${image}</div>`;
 }
 
 export function contactTargetFor(channel: "email" | "sms", customer: { email?: string; phone?: string } | undefined) {

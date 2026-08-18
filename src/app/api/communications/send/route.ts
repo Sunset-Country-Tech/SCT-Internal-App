@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
-import { appendEmailSignature, buildMailtoUrl, buildSmsUrl, communicationSendSchema, type CommunicationSendInput } from "@/lib/communications";
+import { appendEmailSignature, buildEmailHtml, buildMailtoUrl, buildSmsUrl, communicationSendSchema, type CommunicationSendInput } from "@/lib/communications";
 
 export const runtime = "nodejs";
 
@@ -54,6 +54,8 @@ function resolveSmtpSettings(settings: CommunicationSendInput["settings"]) {
     smtpFromEmail: readEnvString("SMTP_FROM_EMAIL", settings.smtpFromEmail),
     smtpReplyToEmail: readEnvString("SMTP_REPLY_TO_EMAIL", settings.smtpReplyToEmail),
     emailSignature: readEnvString("EMAIL_SIGNATURE", settings.emailSignature),
+    emailSignatureImageUrl: readEnvString("EMAIL_SIGNATURE_IMAGE_URL", settings.emailSignatureImageUrl),
+    emailSignatureImageAlt: readEnvString("EMAIL_SIGNATURE_IMAGE_ALT", settings.emailSignatureImageAlt),
     smtpAuthMethod: readEnvString("SMTP_AUTH_METHOD", settings.smtpAuthMethod),
     smtpUsernameEnv: settings.smtpUsernameEnv,
     smtpPasswordEnv: settings.smtpPasswordEnv,
@@ -87,6 +89,7 @@ async function sendEmail(input: CommunicationSendInput) {
     to: input.to,
     subject: input.subject || `Message from ${settings.smtpFromName || "Sunset Country Tech"}`,
     text: input.body,
+    html: buildEmailHtml(input.body, "", settings.emailSignatureImageUrl, settings.emailSignatureImageAlt),
   });
 
   return NextResponse.json({ ok: true, mode: "sent", provider: "smtp", id: info.messageId ?? "" });

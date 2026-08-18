@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendEmailSignature, buildMailtoUrl, buildSmsUrl, contactTargetFor } from "../src/lib/communications";
+import { appendEmailSignature, buildEmailHtml, buildMailtoUrl, buildSmsUrl, contactTargetFor } from "../src/lib/communications";
 
 test("email fallback URL preserves address, subject, and body", () => {
   const url = buildMailtoUrl("customer@example.test", "Repair update", "Your laptop is ready.");
@@ -24,4 +24,12 @@ test("contact targets switch between email and sms", () => {
 test("email signature is appended with a clean separator", () => {
   assert.equal(appendEmailSignature("Your laptop is ready.\n", "Kind regards,\nSCT"), "Your laptop is ready.\n\nKind regards,\nSCT");
   assert.equal(appendEmailSignature("No signature here.", ""), "No signature here.");
+});
+
+test("email HTML includes escaped body text and optional image signature", () => {
+  const html = buildEmailHtml("Ready <today>", "Kind regards,\nSCT", "https://cdn.example/signature.png", "SCT signature");
+
+  assert.match(html, /Ready &lt;today&gt;/);
+  assert.match(html, /Kind regards,<br>SCT/);
+  assert.match(html, /<img src="https:\/\/cdn.example\/signature.png" alt="SCT signature"/);
 });

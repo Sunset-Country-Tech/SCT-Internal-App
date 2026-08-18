@@ -170,6 +170,17 @@ export function SettingsPanel({ role, settings, onChange }: Props) {
                 <Field label="From email"><Input disabled={!canWrite} type="email" value={settings.smtpFromEmail} onChange={(event) => set("smtpFromEmail", event.target.value)} /></Field>
                 <Field label="Reply-to email"><Input disabled={!canWrite} type="email" value={settings.smtpReplyToEmail} onChange={(event) => set("smtpReplyToEmail", event.target.value)} /></Field>
                 <div className="md:col-span-4"><Field label="Email signature"><TextArea disabled={!canWrite} value={settings.emailSignature} onChange={(event) => set("emailSignature", event.target.value)} placeholder="Kind regards,&#10;Sunset Country Tech" /></Field></div>
+                <Field label="Signature image URL"><Input disabled={!canWrite} value={settings.emailSignatureImageUrl} onChange={(event) => set("emailSignatureImageUrl", event.target.value)} placeholder="/signature.png or https://example.com/signature.png" /></Field>
+                <Field label="Signature image alt text"><Input disabled={!canWrite} value={settings.emailSignatureImageAlt} onChange={(event) => set("emailSignatureImageAlt", event.target.value)} /></Field>
+                {settings.emailSignatureImageUrl ? (
+                  <div className="md:col-span-2">
+                    <p className="mb-1 text-sm font-bold text-slate-800">Signature image preview</p>
+                    <div className="rounded-[8px] border border-slate-200 bg-slate-50 p-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={settings.emailSignatureImageUrl} alt={settings.emailSignatureImageAlt || "Email signature"} className="max-h-32 max-w-full object-contain" />
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 

@@ -17,6 +17,8 @@ test("saved settings from older app versions are upgraded with integration defau
   assert.equal(settings.smtpRequireTls, true);
   assert.equal(settings.smtpReplyToEmail, "hello@sunsetcountry.tech");
   assert.match(settings.emailSignature, /Sunset Country Tech/);
+  assert.equal(settings.emailSignatureImageUrl, "");
+  assert.equal(settings.emailSignatureImageAlt, "Sunset Country Tech");
   assert.equal(settings.imapEnabled, false);
   assert.equal(settings.imapHost, "");
   assert.equal(settings.imapPort, 993);
