@@ -24,6 +24,49 @@ Dev login:
 - Email: `owner@sunsetcountry.tech`
 - Password: `sunset-demo-2026`
 
+## Docker
+
+Run the app and PostgreSQL together:
+
+```bash
+docker compose up --build
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Docker Compose includes a local Postgres database and runs Prisma migrations on app startup. The bundled Docker login is:
+
+- Email: `owner@sunsetcountry.tech`
+- Password: `sunset-demo-2026`
+
+For production Docker deployments, override at least:
+
+- `AUTH_SECRET`
+- `DATABASE_URL`
+- `INTERNAL_USERS_JSON`
+
+Build just the app image:
+
+```bash
+docker build -t sct-internal-app .
+```
+
+Run it against an existing Postgres database:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e AUTH_SECRET="replace-with-a-long-random-secret" \
+  -e DATABASE_URL="postgresql://user:password@host:5432/sct_internal" \
+  -e INTERNAL_USERS_JSON='[{"id":"owner","email":"owner@sunsetcountry.tech","name":"Owner","role":"Owner","passwordHash":"$2b$12$replace-with-bcrypt-hash"}]' \
+  sct-internal-app
+```
+
+Set `SKIP_DB_MIGRATE=1` if migrations are handled by your deployment pipeline.
+
 ## Production Setup
 
 Set:
