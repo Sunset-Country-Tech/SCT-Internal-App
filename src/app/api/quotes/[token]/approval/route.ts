@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildQuoteApprovalAudit, quoteApprovalSchema } from "@/lib/quote-approval";
 import { findQuoteForApproval } from "@/lib/server/quotes";
 import { prisma } from "@/lib/server/db";
+import { relativeRedirect } from "@/lib/server/http";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,7 @@ export async function POST(request: Request, props: RouteContext<"/api/quotes/[t
   });
 
   if (!parsed.success) {
-    return NextResponse.redirect(new URL(`/q/${token}?error=validation`, request.url), { status: 303 });
+    return relativeRedirect(`/q/${token}?error=validation`);
   }
 
   const audit = buildQuoteApprovalAudit(parsed.data, request.headers.get("x-forwarded-for")?.split(",")[0]?.trim());
@@ -46,12 +47,12 @@ export async function POST(request: Request, props: RouteContext<"/api/quotes/[t
         },
       });
     } catch {
-      return NextResponse.redirect(new URL(`/q/${token}?error=storage`, request.url), { status: 303 });
+      return relativeRedirect(`/q/${token}?error=storage`);
     }
   }
 
   const result = parsed.data.decision.toLowerCase().replace(/\s+/g, "-");
-  const response = NextResponse.redirect(new URL(`/q/${token}?result=${result}`, request.url), { status: 303 });
+  const response = relativeRedirect(`/q/${token}?result=${result}`);
   response.headers.set("x-sct-audit-event", audit.auditEvent);
   return response;
 }

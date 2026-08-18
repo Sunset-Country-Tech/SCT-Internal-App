@@ -23,8 +23,9 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
       DATABASE_URL: postgresql://sct:sct_dev_password@db:5432/sct_internal
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       AUTH_SECRET: ${AUTH_SECRET:-docker-dev-change-this-secret-before-production}
       INTERNAL_USERS_JSON: '[{"id":"owner","email":"owner@sunsetcountry.tech","name":"Owner","role":"Owner","passwordHash":"$$2b$$12$$AaTOUWJQBb1KpyNpA0uOlurGrPr43.67hJpHCFI/vUx734nNy.1.i"}]'
       SMTP_USERNAME: ${SMTP_USERNAME:-}

@@ -48,6 +48,7 @@ For production Docker deployments, override at least:
 - `AUTH_SECRET`
 - `DATABASE_URL`
 - `INTERNAL_USERS_JSON`
+- `NEXT_PUBLIC_SITE_URL` if you deploy behind a public hostname.
 
 Build just the app image:
 
@@ -66,6 +67,8 @@ docker run --rm -p 3000:3000 \
 ```
 
 Set `SKIP_DB_MIGRATE=1` if migrations are handled by your deployment pipeline.
+
+The app uses relative redirects for login/logout so it stays on whichever address you open, such as `http://192.168.1.20:3000`.
 
 ## Production Setup
 

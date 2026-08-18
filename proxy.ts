@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { AUTH_COOKIE, getAuthSecret, verifySession } from "@/lib/auth-cookie";
+import { relativeRedirect } from "@/lib/server/http";
 
 const publicPrefixes = ["/login", "/q", "/api/auth", "/api/quotes", "/_next", "/favicon.ico"];
 
@@ -14,10 +15,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const url = request.nextUrl.clone();
-  url.pathname = "/login";
-  url.searchParams.set("returnTo", `${pathname}${request.nextUrl.search}`);
-  return NextResponse.redirect(url);
+  const returnTo = encodeURIComponent(`${pathname}${request.nextUrl.search}`);
+  return relativeRedirect(`/login?returnTo=${returnTo}`, 307);
 }
 
 export const config = {
