@@ -1,8 +1,10 @@
 "use client";
 
-import { AlertTriangle, Bell, CalendarPlus, CheckCircle2, CreditCard, FilePlus2, LogOut, Menu, Plus, Save, Search, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Bell, CalendarPlus, CheckCircle2, CreditCard, FilePlus2, LogOut, Mail, Menu, MessageCircle, Plus, Save, Search, Send, UserPlus, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { contactTargetFor } from "@/lib/communications";
 import {
   alerts,
   appointments as seedAppointments,
@@ -42,8 +44,10 @@ type JobRecord = (typeof seedJobs)[number];
 type QuoteRecord = (typeof seedQuotes)[number];
 type InvoiceRecord = (typeof seedInvoices)[number];
 type AppointmentRecord = (typeof seedAppointments)[number];
-type ModalMode = "job" | "customer" | "quote" | "appointment" | "payment" | "workflow" | null;
+type ModalMode = "job" | "customer" | "quote" | "appointment" | "payment" | "workflow" | "communication" | null;
 type ActivityRecord = { id: string; title: string; detail: string; createdAt: string };
+type CommunicationDraft = { customer: string; channel: "email" | "sms"; to: string; subject: string; body: string };
+type CommunicationRecord = CommunicationDraft & { id: string; status: string; fallbackUrl?: string; createdAt: string };
 type OperationsData = {
   customers: CustomerRecord[];
   jobs: JobRecord[];
@@ -85,6 +89,10 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className="h-10 w-full rounded-[8px] border border-slate-200 px-3 text-sm outline-none focus:border-[#ff8a00]" />;
 }
 
+function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className="min-h-32 w-full rounded-[8px] border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#ff8a00]" />;
+}
+
 export function OperationsApp({ user }: Props) {
   const [active, setActive] = useState<(typeof navItems)[number]["label"]>("Dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -98,6 +106,14 @@ export function OperationsApp({ user }: Props) {
   const [invoiceRecords, setInvoiceRecords] = useState<InvoiceRecord[]>(seedInvoices);
   const [appointmentRecords, setAppointmentRecords] = useState<AppointmentRecord[]>(seedAppointments);
   const [activityRecords, setActivityRecords] = useState<ActivityRecord[]>([]);
+  const [communicationRecords, setCommunicationRecords] = useState<CommunicationRecord[]>([]);
+  const [communicationDraft, setCommunicationDraft] = useState<CommunicationDraft>({
+    customer: seedCustomers[0]?.name ?? "",
+    channel: "email",
+    to: seedCustomers[0]?.email ?? "",
+    subject: "Update from Sunset Country Tech",
+    body: "",
+  });
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
 
   const quoteTotal = calculateTotals(quoteRecords[0]?.items ?? [], settings.gstRegistered).total;
@@ -106,6 +122,7 @@ export function OperationsApp({ user }: Props) {
   const filteredJobs = jobRecords.filter((job) => [job.number, job.customer, job.type, job.device, job.status].join(" ").toLowerCase().includes(loweredQuery));
   const filteredCustomers = customerRecords.filter((customer) => [customer.id, customer.name, customer.phone, customer.email, customer.area, customer.type].join(" ").toLowerCase().includes(loweredQuery));
   const newJobNumber = useMemo(() => nextNumber(settings.numbering.job, 2026, jobRecords.map((job) => job.number)), [settings.numbering.job, jobRecords]);
+  const selectedCommunicationCustomer = useMemo(() => customerRecords.find((customer) => customer.name === communicationDraft.customer), [communicationDraft.customer, customerRecords]);
   const alertMessages = useMemo(() => [
     ...alerts.map((alert, index) => ({ id: `seed-alert-${index}`, text: alert })),
     ...activityRecords.slice(0, 3).map((activity) => ({ id: activity.id, text: activity.title })),
@@ -123,6 +140,7 @@ export function OperationsApp({ user }: Props) {
       setInvoiceRecords(loadRecords("sct-invoices", seedInvoices));
       setAppointmentRecords(loadRecords("sct-appointments", seedAppointments));
       setActivityRecords(loadRecords("sct-activity", [] as ActivityRecord[]));
+      setCommunicationRecords(loadRecords("sct-communications", [] as CommunicationRecord[]));
       const storedSettings = window.localStorage.getItem("sct-settings");
       if (storedSettings) {
         try {
@@ -186,6 +204,40 @@ export function OperationsApp({ user }: Props) {
     }
     setAlertsOpen(false);
     setModal(mode);
+  }
+
+  function openCommunication(customerName = customerRecords[0]?.name ?? "", channel: "email" | "sms" = "email") {
+    if (!can(user.role, "customers:write")) {
+      showNotice("Your role can view communications but cannot send messages.");
+      return;
+    }
+    const customer = customerRecords.find((record) => record.name === customerName) ?? customerRecords[0];
+    setCommunicationDraft({
+      customer: customer?.name ?? "",
+      channel,
+      to: contactTargetFor(channel, customer),
+      subject: "Update from Sunset Country Tech",
+      body: "",
+    });
+    setAlertsOpen(false);
+    setModal("communication");
+  }
+
+  function updateCommunicationCustomer(customerName: string) {
+    const customer = customerRecords.find((record) => record.name === customerName);
+    setCommunicationDraft((draft) => ({
+      ...draft,
+      customer: customerName,
+      to: contactTargetFor(draft.channel, customer),
+    }));
+  }
+
+  function updateCommunicationChannel(channel: "email" | "sms") {
+    setCommunicationDraft((draft) => ({
+      ...draft,
+      channel,
+      to: contactTargetFor(channel, selectedCommunicationCustomer),
+    }));
   }
 
   function addActivity(title: string, detail: string) {
@@ -332,6 +384,49 @@ export function OperationsApp({ user }: Props) {
     showNotice("Workflow draft added to Tasks.");
   }
 
+  async function sendCommunication(formData: FormData) {
+    const draft: CommunicationDraft = {
+      customer: String(formData.get("customer") ?? "").trim(),
+      channel: String(formData.get("channel") ?? "email") === "sms" ? "sms" : "email",
+      to: String(formData.get("to") ?? "").trim(),
+      subject: String(formData.get("subject") ?? "").trim(),
+      body: String(formData.get("body") ?? "").trim(),
+    };
+    if (!draft.customer || !draft.to || !draft.body) {
+      showNotice("Choose a customer, target, and message.");
+      return;
+    }
+
+    let result: { ok?: boolean; mode?: string; fallbackUrl?: string; message?: string } = {};
+    try {
+      const response = await fetch("/api/communications/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...draft, customerName: draft.customer, settings }),
+      });
+      result = await response.json();
+    } catch {
+      result = { ok: false, mode: "draft", message: "Delivery service unavailable." };
+    }
+
+    const status = result.ok && result.mode === "sent" ? "Sent" : "Draft";
+    const record: CommunicationRecord = {
+      ...draft,
+      id: `COM-${String(communicationRecords.length + 1).padStart(4, "0")}`,
+      status,
+      fallbackUrl: result.fallbackUrl,
+      createdAt: new Date().toLocaleString("en-AU"),
+    };
+    const next = [record, ...communicationRecords].slice(0, 50);
+    setCommunicationRecords(next);
+    saveRecords("sct-communications", next);
+    addActivity(status === "Sent" ? "Customer contacted" : "Communication drafted", `${draft.channel.toUpperCase()} for ${draft.customer}.`);
+    void syncOperation({ action: "draft-workflow", title: status === "Sent" ? "Customer contacted" : "Communication drafted", detail: `${draft.channel.toUpperCase()} for ${draft.customer}: ${draft.subject || draft.body.slice(0, 80)}` });
+    setModal(null);
+    openSection("Communications");
+    showNotice(status === "Sent" ? "Message sent." : result.message ?? "Message saved as a draft.");
+  }
+
   function completeJob(number: string) {
     const next = jobRecords.map((job) => job.number === number ? { ...job, status: "Completed", next: "Invoice or archive" } : job);
     setJobRecords(next);
@@ -339,6 +434,42 @@ export function OperationsApp({ user }: Props) {
     void syncOperation({ action: "complete-job", jobNumber: number });
     addActivity("Job completed", `${number} marked completed.`);
     showNotice(`${number} marked completed.`);
+  }
+
+  function renderModulePanel() {
+    if (active === "Tasks") {
+      return <div className="space-y-4"><div className="flex justify-end"><button onClick={() => guardedOpen("workflow", "jobs:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><Save className="h-4 w-4" /> New Task</button></div><div className="grid gap-3">{activityRecords.length ? activityRecords.map((activity) => <div key={activity.id} className="rounded-[8px] border border-slate-200 p-4"><p className="font-black">{activity.title}</p><p className="text-sm text-slate-600">{activity.detail}</p><p className="mt-2 text-xs font-bold text-slate-400">{activity.createdAt}</p></div>) : <p className="text-sm text-slate-600">No workflow drafts yet.</p>}</div></div>;
+    }
+
+    if (active === "Communications") {
+      return <div className="space-y-4"><div className="flex flex-wrap justify-end gap-2"><button onClick={() => openCommunication(undefined, "email")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><Mail className="h-4 w-4" /> New Email</button><button onClick={() => openCommunication(undefined, "sms")} className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-slate-200 px-4 text-sm font-black"><MessageCircle className="h-4 w-4" /> New SMS</button></div><div className="grid gap-3">{communicationRecords.length ? communicationRecords.map((message) => <div key={message.id} className="rounded-[8px] border border-slate-200 p-4"><div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start"><div><p className="font-black">{message.customer}</p><p className="text-sm text-slate-600">{message.channel.toUpperCase()} to {message.to}</p></div><Badge>{message.status}</Badge></div>{message.subject ? <p className="mt-3 text-sm font-bold">{message.subject}</p> : null}<p className="mt-1 text-sm text-slate-600">{message.body}</p><div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-bold text-slate-400"><span>{message.createdAt}</span>{message.fallbackUrl ? <a href={message.fallbackUrl} className="text-[#ff8a00]">Open fallback sender</a> : null}</div></div>) : <p className="text-sm text-slate-600">No customer messages yet.</p>}</div></div>;
+    }
+
+    const moduleActions: Record<string, Array<{ label: string; icon: LucideIcon; run: () => void }>> = {
+      "Digital Literacy": [
+        { label: "Book Session", icon: CalendarPlus, run: () => guardedOpen("appointment", "jobs:write") },
+        { label: "Message Learner", icon: MessageCircle, run: () => openCommunication(undefined, "sms") },
+        { label: "Draft Lesson Task", icon: Save, run: () => guardedOpen("workflow", "jobs:write") },
+      ],
+      "Business IT": [
+        { label: "Create IT Job", icon: Plus, run: () => guardedOpen("job", "jobs:write") },
+        { label: "Send Client Update", icon: Mail, run: () => openCommunication(undefined, "email") },
+        { label: "Draft Site Checklist", icon: Save, run: () => guardedOpen("workflow", "jobs:write") },
+      ],
+      "3D Printing": [
+        { label: "Create Print Job", icon: Plus, run: () => guardedOpen("job", "jobs:write") },
+        { label: "Quote Print", icon: FilePlus2, run: () => guardedOpen("quote", "quotes:write") },
+        { label: "Message Customer", icon: MessageCircle, run: () => openCommunication(undefined, "sms") },
+      ],
+      Parts: [
+        { label: "Parts Job", icon: Plus, run: () => guardedOpen("job", "jobs:write") },
+        { label: "Parts Quote", icon: FilePlus2, run: () => guardedOpen("quote", "quotes:write") },
+        { label: "Supplier Follow-Up", icon: Save, run: () => guardedOpen("workflow", "jobs:write") },
+      ],
+    };
+    const actions = moduleActions[active] ?? [];
+
+    return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-3">{actions.map(({ label, icon: Icon, run }) => <button key={label} onClick={run} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><Icon className="h-4 w-4" />{label}</button>)}</div><div className="grid gap-3">{jobRecords.filter((job) => job.type === active || (active === "Parts" && job.status.includes("Parts"))).slice(0, 6).map((job) => <div key={job.number} className="rounded-[8px] border border-slate-200 p-4"><p className="font-black">{job.number} - {job.customer}</p><p className="text-sm text-slate-600">{job.device} - {job.status}</p><p className="mt-2 text-sm text-slate-600">{job.next}</p></div>)}{!jobRecords.some((job) => job.type === active || (active === "Parts" && job.status.includes("Parts"))) ? <p className="text-sm text-slate-600">No active {active.toLowerCase()} jobs yet.</p> : null}</div></div>;
   }
 
   return (
@@ -383,32 +514,33 @@ export function OperationsApp({ user }: Props) {
               <Metric label="Outstanding" value={formatCurrency(outstanding, settings.currency)} detail="1 invoice due" />
               <Metric label="Today" value={String(appointmentRecords.length)} detail="appointments booked" />
             </div>
-            <Panel title="Quick Actions"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <Panel title="Quick Actions"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
               <button onClick={() => guardedOpen("customer", "customers:write")} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><UserPlus className="h-4 w-4" /> Customer</button>
               <button onClick={() => guardedOpen("job", "jobs:write")} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><Plus className="h-4 w-4" /> Job</button>
               <button onClick={() => guardedOpen("quote", "quotes:write")} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><FilePlus2 className="h-4 w-4" /> Quote</button>
               <button onClick={() => guardedOpen("appointment", "jobs:write")} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><CalendarPlus className="h-4 w-4" /> Appointment</button>
               <button onClick={() => guardedOpen("payment", "payments:write")} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><CreditCard className="h-4 w-4" /> Payment</button>
+              <button onClick={() => openCommunication()} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><Send className="h-4 w-4" /> Contact</button>
             </div></Panel>
             <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
               <Panel title="Job Pipeline"><div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr className="text-xs uppercase text-slate-500"><th className="p-3">Job</th><th className="p-3">Customer</th><th className="p-3">Type</th><th className="p-3">Status</th><th className="p-3">Next</th><th className="p-3">Action</th></tr></thead><tbody>{filteredJobs.map((job) => <tr key={job.number} className="border-t border-slate-100"><td className="p-3 font-black">{job.number}<p className="text-xs font-normal text-slate-500">{job.device}</p></td><td className="p-3">{job.customer}</td><td className="p-3">{job.type}</td><td className="p-3"><Badge>{job.status}</Badge></td><td className="p-3">{job.next}</td><td className="p-3"><button onClick={() => completeJob(job.number)} className="inline-flex items-center gap-1 rounded-[8px] border border-slate-200 px-2 py-1 text-xs font-black"><CheckCircle2 className="h-3 w-3" /> Complete</button></td></tr>)}</tbody></table></div></Panel>
               <Panel title="Alerts">{alertMessages.map((alert) => <button key={alert.id} onClick={() => openSection(alert.text.includes("Invoice") ? "Invoices" : alert.text.includes("Quote") ? "Quotes" : "Tasks")} className="mb-3 flex w-full gap-3 rounded-[8px] bg-amber-50 p-3 text-left text-sm font-bold text-amber-900 hover:bg-amber-100"><AlertTriangle className="h-4 w-4 shrink-0" />{alert.text}</button>)}</Panel>
             </div>
           </> : null}
-          {active === "Customers" ? <Panel title="Customers"><div className="mb-4 flex justify-end"><button onClick={() => guardedOpen("customer", "customers:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><UserPlus className="h-4 w-4" /> New Customer</button></div><div className="grid gap-3 md:grid-cols-3">{filteredCustomers.map((customer) => <button key={customer.id} onClick={() => showNotice(`${customer.name} selected.`)} className="rounded-[8px] border border-slate-200 p-4 text-left hover:border-[#ff8a00]"><p className="font-black">{customer.name}</p><p className="text-sm text-slate-600">{customer.phone}</p><p className="text-sm text-slate-600">{customer.email}</p><div className="mt-3 flex flex-wrap gap-2">{customer.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div></button>)}</div></Panel> : null}
+          {active === "Customers" ? <Panel title="Customers"><div className="mb-4 flex justify-end"><button onClick={() => guardedOpen("customer", "customers:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><UserPlus className="h-4 w-4" /> New Customer</button></div><div className="grid gap-3 md:grid-cols-3">{filteredCustomers.map((customer) => <div key={customer.id} className="rounded-[8px] border border-slate-200 p-4"><p className="font-black">{customer.name}</p><p className="text-sm text-slate-600">{customer.phone}</p><p className="text-sm text-slate-600">{customer.email}</p><div className="mt-3 flex flex-wrap gap-2">{customer.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><div className="mt-4 flex gap-2"><button onClick={() => openCommunication(customer.name, "email")} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-xs font-black hover:border-[#ff8a00]"><Mail className="h-4 w-4" /> Email</button><button onClick={() => openCommunication(customer.name, "sms")} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-xs font-black hover:border-[#ff8a00]"><MessageCircle className="h-4 w-4" /> SMS</button></div></div>)}</div></Panel> : null}
           {active === "Jobs" ? <Panel title="Jobs"><div className="grid gap-3">{filteredJobs.map((job) => <div key={job.number} className="flex flex-col justify-between gap-3 rounded-[8px] border border-slate-200 p-4 md:flex-row"><button onClick={() => showNotice(`${job.number}: ${job.next}`)} className="text-left"><p className="font-black">{job.number} - {job.customer}</p><p className="text-sm text-slate-600">{job.type} - {job.device}</p></button><div className="flex items-center gap-2"><Badge>{job.status}</Badge><button onClick={() => completeJob(job.number)} className="rounded-[8px] border border-slate-200 px-3 py-2 text-xs font-black">Complete</button></div></div>)}</div></Panel> : null}
           {active === "Calendar" ? <Panel title="Calendar"><div className="mb-4 flex justify-end"><button onClick={() => guardedOpen("appointment", "jobs:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><CalendarPlus className="h-4 w-4" /> Book</button></div><div className="grid gap-3 md:grid-cols-3">{appointmentRecords.map((appointment) => <button key={`${appointment.time}-${appointment.customer}-${appointment.location}`} onClick={() => showNotice(`${appointment.customer} at ${appointment.location}`)} className="rounded-[8px] border border-slate-200 p-4 text-left hover:border-[#ff8a00]"><p className="text-sm font-black text-[#ff8a00]">{appointment.time}</p><p className="font-black">{appointment.type}</p><p className="text-sm text-slate-600">{appointment.customer} - {appointment.location}</p></button>)}</div></Panel> : null}
           {active === "Quotes" ? <Panel title="Quotes"><div className="mb-4 flex justify-end"><button onClick={() => guardedOpen("quote", "quotes:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><FilePlus2 className="h-4 w-4" /> New Quote</button></div><div className="grid gap-3">{quoteRecords.map((quote) => <div key={quote.number} className="rounded-[8px] border border-slate-200 p-4"><p className="font-black">{quote.number}</p><p className="text-sm text-slate-600">{quote.customer} - {quote.job} - {quote.status}</p><a className="mt-3 inline-flex rounded-[8px] bg-[#ff8a00] px-3 py-2 text-xs font-black text-[#0d1220]" href={`/q/${quote.token}`}>Open approval link</a></div>)}</div></Panel> : null}
           {active === "Invoices" || active === "Payments" ? <Panel title="Invoices & Payments"><div className="mb-4 flex justify-end"><button onClick={() => guardedOpen("payment", "payments:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><CreditCard className="h-4 w-4" /> Record Payment</button></div><div className="grid gap-3">{invoiceRecords.map((invoice) => <div key={invoice.number} className="flex justify-between rounded-[8px] border border-slate-200 p-4"><button onClick={() => showNotice(`${invoice.number} status: ${invoice.status}`)} className="text-left"><p className="font-black">{invoice.number}</p><p className="text-sm text-slate-600">{invoice.customer}</p></button><p className="font-black">{formatCurrency(invoice.total - invoice.paid, settings.currency)}</p></div>)}</div></Panel> : null}
-          {["Digital Literacy", "Business IT", "3D Printing", "Parts", "Communications", "Tasks"].includes(active) ? <Panel title={active}>{active === "Tasks" ? <div className="grid gap-3">{activityRecords.length ? activityRecords.map((activity) => <div key={activity.id} className="rounded-[8px] border border-slate-200 p-4"><p className="font-black">{activity.title}</p><p className="text-sm text-slate-600">{activity.detail}</p><p className="mt-2 text-xs font-bold text-slate-400">{activity.createdAt}</p></div>) : <p className="text-sm text-slate-600">No workflow drafts yet.</p>}</div> : <><p className="text-sm text-slate-600">Create reusable operating checklists, follow-up tasks, and customer communications from this module.</p><button onClick={() => guardedOpen("workflow", "jobs:write")} className="mt-4 inline-flex h-10 items-center gap-2 rounded-[8px] border border-slate-200 px-4 text-sm font-bold"><Save className="h-4 w-4" /> Draft workflow</button></>}</Panel> : null}
+          {["Digital Literacy", "Business IT", "3D Printing", "Parts", "Communications", "Tasks"].includes(active) ? <Panel title={active}>{renderModulePanel()}</Panel> : null}
           {active === "Settings" ? <SettingsPanel role={user.role} settings={settings} onChange={setSettings} /> : null}
           <footer className="rounded-[8px] border border-slate-200 bg-white p-4 text-xs text-slate-500">{settings.businessName} - internal only - public access limited to quote approval links.</footer>
         </main>
       </div>
       {modal ? <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4">
         <div className="w-full max-w-2xl rounded-[8px] bg-white shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-200 p-5"><p className="text-lg font-black">{modal === "job" ? "New Job" : modal === "customer" ? "New Customer" : modal === "quote" ? "New Quote" : modal === "appointment" ? "Book Appointment" : modal === "payment" ? "Record Payment" : "Draft Workflow"}</p><button onClick={() => setModal(null)} aria-label="Close dialog"><X className="h-5 w-5" /></button></div>
-          <form action={(formData) => { if (modal === "job") createJob(formData); if (modal === "customer") createCustomer(formData); if (modal === "quote") createQuote(formData); if (modal === "appointment") createAppointment(formData); if (modal === "payment") recordPayment(formData); if (modal === "workflow") draftWorkflow(formData); }} className="grid gap-4 p-5 md:grid-cols-2">
+          <div className="flex items-center justify-between border-b border-slate-200 p-5"><p className="text-lg font-black">{modal === "job" ? "New Job" : modal === "customer" ? "New Customer" : modal === "quote" ? "New Quote" : modal === "appointment" ? "Book Appointment" : modal === "payment" ? "Record Payment" : modal === "communication" ? "Contact Customer" : "Draft Workflow"}</p><button onClick={() => setModal(null)} aria-label="Close dialog"><X className="h-5 w-5" /></button></div>
+          <form action={(formData) => { if (modal === "job") createJob(formData); if (modal === "customer") createCustomer(formData); if (modal === "quote") createQuote(formData); if (modal === "appointment") createAppointment(formData); if (modal === "payment") recordPayment(formData); if (modal === "workflow") draftWorkflow(formData); if (modal === "communication") void sendCommunication(formData); }} className="grid gap-4 p-5 md:grid-cols-2">
             {modal === "customer" ? <>
               <Field label="Name"><Input name="name" required /></Field>
               <Field label="Type"><Select name="type"><option>Individual</option><option>Business</option><option>Digital Literacy</option></Select></Field>
@@ -445,7 +577,14 @@ export function OperationsApp({ user }: Props) {
               <Field label="Title"><Input name="title" defaultValue={`${active} workflow`} required /></Field>
               <div className="md:col-span-2"><Field label="Detail"><Input name="detail" defaultValue={`Draft operating workflow for ${active}.`} /></Field></div>
             </> : null}
-            <div className="flex justify-end gap-2 md:col-span-2"><button type="button" onClick={() => setModal(null)} className="h-10 rounded-[8px] border border-slate-200 px-4 text-sm font-bold">Cancel</button><button className="h-10 rounded-[8px] bg-[#ff8a00] px-4 text-sm font-black text-[#0d1220]">Save</button></div>
+            {modal === "communication" ? <>
+              <Field label="Customer"><Select name="customer" value={communicationDraft.customer} onChange={(event) => updateCommunicationCustomer(event.target.value)}>{customerRecords.map((customer) => <option key={customer.id}>{customer.name}</option>)}</Select></Field>
+              <Field label="Channel"><Select name="channel" value={communicationDraft.channel} onChange={(event) => updateCommunicationChannel(event.target.value === "sms" ? "sms" : "email")}><option value="email">Email</option><option value="sms">SMS</option></Select></Field>
+              <Field label={communicationDraft.channel === "email" ? "Email address" : "Phone number"}><Input name="to" value={communicationDraft.to} onChange={(event) => setCommunicationDraft((draft) => ({ ...draft, to: event.target.value }))} required /></Field>
+              {communicationDraft.channel === "email" ? <Field label="Subject"><Input name="subject" value={communicationDraft.subject} onChange={(event) => setCommunicationDraft((draft) => ({ ...draft, subject: event.target.value }))} /></Field> : <input name="subject" type="hidden" value="" />}
+              <div className="md:col-span-2"><Field label="Message"><TextArea name="body" value={communicationDraft.body} onChange={(event) => setCommunicationDraft((draft) => ({ ...draft, body: event.target.value }))} required placeholder="Write the customer update..." /></Field></div>
+            </> : null}
+            <div className="flex justify-end gap-2 md:col-span-2"><button type="button" onClick={() => setModal(null)} className="h-10 rounded-[8px] border border-slate-200 px-4 text-sm font-bold">Cancel</button><button className="h-10 rounded-[8px] bg-[#ff8a00] px-4 text-sm font-black text-[#0d1220]">{modal === "communication" ? "Send" : "Save"}</button></div>
           </form>
         </div>
       </div> : null}

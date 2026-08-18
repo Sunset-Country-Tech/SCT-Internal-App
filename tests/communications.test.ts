@@ -1,0 +1,22 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { buildMailtoUrl, buildSmsUrl, contactTargetFor } from "../src/lib/communications";
+
+test("email fallback URL preserves address, subject, and body", () => {
+  const url = buildMailtoUrl("customer@example.test", "Repair update", "Your laptop is ready.");
+
+  assert.equal(url, "mailto:customer%40example.test?subject=Repair+update&body=Your+laptop+is+ready.");
+});
+
+test("sms fallback URL preserves phone and message body", () => {
+  const url = buildSmsUrl("0400 123 456", "Your appointment is booked.");
+
+  assert.equal(url, "sms:0400%20123%20456?body=Your+appointment+is+booked.");
+});
+
+test("contact targets switch between email and sms", () => {
+  const customer = { email: "hello@example.test", phone: "0400 111 222" };
+
+  assert.equal(contactTargetFor("email", customer), "hello@example.test");
+  assert.equal(contactTargetFor("sms", customer), "0400 111 222");
+});
