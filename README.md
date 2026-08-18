@@ -84,6 +84,7 @@ The Settings page stores provider choices, endpoints, sender details, bucket nam
 Generate a staff password hash:
 
 ```bash
+npm install
 npm run auth:hash-password -- "a-long-password"
 ```
 
