@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 245" role="img" aria-labelledby="title desc">
+  <title id="title">Sunset Country Tech stacked logo</title>
+  <desc id="desc">Stacked logo with sunset circuit icon above the business name.</desc>
+  <image href="/brand/logo-icon.svg" x="46" y="0" width="128" height="128"/>
+  <text x="110" y="161" text-anchor="middle" fill="#FFFFFF" font-family="Space Grotesk, Arial, sans-serif" font-size="28" font-weight="800">SUNSET</text>
+  <text x="110" y="190" text-anchor="middle" fill="#FFFFFF" font-family="Space Grotesk, Arial, sans-serif" font-size="28" font-weight="800">COUNTRY</text>
+  <text x="110" y="222" text-anchor="middle" fill="#FF8A00" font-family="Space Grotesk, Arial, sans-serif" font-size="22" font-weight="800" letter-spacing="7">TECH</text>
+</svg>

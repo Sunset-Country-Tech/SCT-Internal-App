@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="0" x2="1080" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0D1220"/>
+      <stop offset=".58" stop-color="#182330"/>
+      <stop offset="1" stop-color="#0D1220"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0" cy="0" r="1" gradientTransform="translate(367 260) rotate(42) scale(420 230)">
+      <stop stop-color="#FFA733"/>
+      <stop offset=".4" stop-color="#FF5E7D"/>
+      <stop offset="1" stop-color="#7861FF" stop-opacity=".12"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#sun)"/>
+</svg>

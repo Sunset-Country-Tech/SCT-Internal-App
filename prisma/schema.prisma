@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  OWNER
+  ADMIN
+  TECHNICIAN
+  SUPPORT
+  ACCOUNTS
+  READ_ONLY
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         RoleName
+  passwordHash String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Customer {
+  id             String          @id @default(cuid())
+  customerNumber String          @unique
+  name           String
+  type           String
+  phone          String?
+  email          String?
+  serviceArea    String?
+  tags           CustomerTag[]
+  jobs           Job[]
+  quotes         Quote[]
+  invoices       Invoice[]
+  deletedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  customers CustomerTag[]
+}
+
+model CustomerTag {
+  customerId String
+  tagId      String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  tag        Tag      @relation(fields: [tagId], references: [id])
+
+  @@id([customerId, tagId])
+}
+
+model Job {
+  id          String             @id @default(cuid())
+  jobNumber   String             @unique
+  customerId  String
+  customer    Customer           @relation(fields: [customerId], references: [id])
+  type        String
+  status      String
+  priority    String
+  device      String?
+  description String
+  dueAt       DateTime?
+  notes       JobNote[]
+  quotes      Quote[]
+  invoices    Invoice[]
+  statusLog   JobStatusHistory[]
+  deletedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model JobNote {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id])
+  body      String
+  visibility String
+  createdAt DateTime @default(now())
+}
+
+model JobStatusHistory {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id])
+  previous  String?
+  next      String
+  createdAt DateTime @default(now())
+}
+
+model Quote {
+  id          String          @id @default(cuid())
+  quoteNumber String          @unique
+  token       String          @unique
+  customerId  String
+  jobId       String?
+  customer    Customer        @relation(fields: [customerId], references: [id])
+  job         Job?            @relation(fields: [jobId], references: [id])
+  status      String
+  items       QuoteItem[]
+  approvals   QuoteApproval[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model QuoteItem {
+  id          String  @id @default(cuid())
+  quoteId     String
+  quote       Quote   @relation(fields: [quoteId], references: [id])
+  description String
+  quantity    Decimal
+  unitPrice   Decimal
+  taxRate     Decimal @default(0)
+}
+
+model QuoteApproval {
+  id        String   @id @default(cuid())
+  quoteId   String
+  quote     Quote    @relation(fields: [quoteId], references: [id])
+  decision  String
+  name      String
+  comment   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  customerId    String
+  jobId         String?
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  job           Job?          @relation(fields: [jobId], references: [id])
+  status        String
+  total         Decimal
+  paid          Decimal       @default(0)
+  payments      Payment[]
+  deletedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  amount    Decimal
+  method    String
+  reference String?
+  paidAt    DateTime
+}
+
+model Appointment {
+  id       String   @id @default(cuid())
+  type     String
+  startsAt DateTime
+  endsAt   DateTime
+  customer String?
+  location String?
+  notes    String?
+}
+
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  event      String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+}

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Sunset Country Tech icon</title>
+  <desc id="desc">Circular sunset with circuit traces in orange, coral and purple.</desc>
+  <defs>
+    <linearGradient id="ring" x1="18" y1="12" x2="108" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFA733"/>
+      <stop offset=".45" stop-color="#FF5E7D"/>
+      <stop offset="1" stop-color="#7861FF"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="34" y1="42" x2="95" y2="74" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8A00"/>
+      <stop offset=".55" stop-color="#FF5E7D"/>
+      <stop offset="1" stop-color="#7861FF"/>
+    </linearGradient>
+    <linearGradient id="trace" x1="11" y1="78" x2="111" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8A00"/>
+      <stop offset=".55" stop-color="#FF5E7D"/>
+      <stop offset="1" stop-color="#7861FF"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 72a46 46 0 0 1 92 0" fill="none" stroke="url(#ring)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M30 72c6-24 24-35 47-31 13 2 22 12 24 31H30Z" fill="url(#sun)"/>
+  <path d="M30 72c15-8 26-13 38-7 10 5 21 1 33-8v15H30Z" fill="#0D1220" opacity=".5"/>
+  <path d="M36 71c10-4 20-7 30-4 6 2 11 5 18 3 7-1 12-5 19-9" fill="none" stroke="#FFB43F" stroke-width="2" opacity=".42"/>
+  <path d="M14 89h25l19-19h54" fill="none" stroke="url(#trace)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M54 111V94l17-17h41" fill="none" stroke="url(#trace)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M25 89h13m20-19h6m-21 32h7m62-25H79" fill="none" stroke="#0D1220" stroke-width="2" opacity=".5"/>
+  <circle cx="14" cy="89" r="7" fill="#0D1220" stroke="#FF8A00" stroke-width="6"/>
+  <circle cx="58" cy="70" r="7" fill="#0D1220" stroke="#FF7333" stroke-width="6"/>
+  <circle cx="44" cy="111" r="7" fill="#0D1220" stroke="#FF8A00" stroke-width="6"/>
+  <path d="M110 76a46 46 0 0 1-26 37" fill="none" stroke="url(#ring)" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="86" cy="112" r="7" fill="#0D1220" stroke="#7861FF" stroke-width="6"/>
+</svg>
