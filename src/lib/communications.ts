@@ -19,6 +19,7 @@ export const communicationSendSchema = z.object({
     smtpFromName: trimmedString.default("Sunset Country Tech"),
     smtpFromEmail: trimmedString.default(""),
     smtpReplyToEmail: trimmedString.default(""),
+    emailSignature: trimmedString.default(""),
     smtpAuthMethod: trimmedString.default("login"),
     smtpUsernameEnv: trimmedString.default("SMTP_USERNAME"),
     smtpPasswordEnv: trimmedString.default("SMTP_PASSWORD"),
@@ -42,6 +43,7 @@ export const mailConnectionEnvNames = [
   "SMTP_FROM_NAME",
   "SMTP_FROM_EMAIL",
   "SMTP_REPLY_TO_EMAIL",
+  "EMAIL_SIGNATURE",
   "SMTP_AUTH_METHOD",
   "IMAP_ENABLED",
   "IMAP_HOST",
@@ -66,6 +68,15 @@ export function buildMailtoUrl(to: string, subject: string, body: string) {
 export function buildSmsUrl(to: string, body: string) {
   const query = new URLSearchParams({ body: body.trim() });
   return `sms:${encodeURIComponent(to.trim())}?${query.toString()}`;
+}
+
+export function appendEmailSignature(body: string, signature: string) {
+  const trimmedBody = body.trimEnd();
+  const trimmedSignature = signature.trim();
+  if (!trimmedSignature) {
+    return trimmedBody;
+  }
+  return `${trimmedBody}\n\n${trimmedSignature}`;
 }
 
 export function contactTargetFor(channel: "email" | "sms", customer: { email?: string; phone?: string } | undefined) {

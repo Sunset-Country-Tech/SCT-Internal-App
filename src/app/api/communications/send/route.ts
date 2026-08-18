@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
-import { buildMailtoUrl, buildSmsUrl, communicationSendSchema, type CommunicationSendInput } from "@/lib/communications";
+import { appendEmailSignature, buildMailtoUrl, buildSmsUrl, communicationSendSchema, type CommunicationSendInput } from "@/lib/communications";
 
 export const runtime = "nodejs";
 
@@ -53,6 +53,7 @@ function resolveSmtpSettings(settings: CommunicationSendInput["settings"]) {
     smtpFromName: readEnvString("SMTP_FROM_NAME", settings.smtpFromName),
     smtpFromEmail: readEnvString("SMTP_FROM_EMAIL", settings.smtpFromEmail),
     smtpReplyToEmail: readEnvString("SMTP_REPLY_TO_EMAIL", settings.smtpReplyToEmail),
+    emailSignature: readEnvString("EMAIL_SIGNATURE", settings.emailSignature),
     smtpAuthMethod: readEnvString("SMTP_AUTH_METHOD", settings.smtpAuthMethod),
     smtpUsernameEnv: settings.smtpUsernameEnv,
     smtpPasswordEnv: settings.smtpPasswordEnv,
@@ -129,9 +130,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid communication payload" }, { status: 400 });
   }
 
+  const input = parsed.data.channel === "email"
+    ? { ...parsed.data, body: appendEmailSignature(parsed.data.body, resolveSmtpSettings(parsed.data.settings).emailSignature) }
+    : parsed.data;
+
   try {
-    return parsed.data.channel === "email" ? await sendEmail(parsed.data) : await sendSms(parsed.data);
+    if (input.channel === "email") {
+      return await sendEmail(input);
+    }
+    return await sendSms(input);
   } catch {
-    return fallbackResponse(parsed.data, "Delivery failed. The message was kept as a draft.");
+    return fallbackResponse(input, "Delivery failed. The message was kept as a draft.");
   }
 }

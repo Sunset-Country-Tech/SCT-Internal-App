@@ -21,6 +21,10 @@ function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className="h-10 w-full rounded-[8px] border border-slate-200 px-3 text-sm outline-none focus:border-[#ff8a00] disabled:bg-slate-100" />;
 }
 
+function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className="min-h-32 w-full rounded-[8px] border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#ff8a00] disabled:bg-slate-100" />;
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="text-sm font-bold text-slate-800">{label}<div className="mt-1">{children}</div></label>;
 }
@@ -165,6 +169,7 @@ export function SettingsPanel({ role, settings, onChange }: Props) {
                 <Field label="From name"><Input disabled={!canWrite} value={settings.smtpFromName} onChange={(event) => set("smtpFromName", event.target.value)} /></Field>
                 <Field label="From email"><Input disabled={!canWrite} type="email" value={settings.smtpFromEmail} onChange={(event) => set("smtpFromEmail", event.target.value)} /></Field>
                 <Field label="Reply-to email"><Input disabled={!canWrite} type="email" value={settings.smtpReplyToEmail} onChange={(event) => set("smtpReplyToEmail", event.target.value)} /></Field>
+                <div className="md:col-span-4"><Field label="Email signature"><TextArea disabled={!canWrite} value={settings.emailSignature} onChange={(event) => set("emailSignature", event.target.value)} placeholder="Kind regards,&#10;Sunset Country Tech" /></Field></div>
               </div>
             </div>
 

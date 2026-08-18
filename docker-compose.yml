@@ -38,6 +38,7 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Sunset Country Tech}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-hello@sunsetcountry.tech}
       SMTP_REPLY_TO_EMAIL: ${SMTP_REPLY_TO_EMAIL:-hello@sunsetcountry.tech}
+      EMAIL_SIGNATURE: ${EMAIL_SIGNATURE:-}
       SMTP_AUTH_METHOD: ${SMTP_AUTH_METHOD:-login}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}

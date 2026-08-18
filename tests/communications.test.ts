@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildMailtoUrl, buildSmsUrl, contactTargetFor } from "../src/lib/communications";
+import { appendEmailSignature, buildMailtoUrl, buildSmsUrl, contactTargetFor } from "../src/lib/communications";
 
 test("email fallback URL preserves address, subject, and body", () => {
   const url = buildMailtoUrl("customer@example.test", "Repair update", "Your laptop is ready.");
@@ -19,4 +19,9 @@ test("contact targets switch between email and sms", () => {
 
   assert.equal(contactTargetFor("email", customer), "hello@example.test");
   assert.equal(contactTargetFor("sms", customer), "0400 111 222");
+});
+
+test("email signature is appended with a clean separator", () => {
+  assert.equal(appendEmailSignature("Your laptop is ready.\n", "Kind regards,\nSCT"), "Your laptop is ready.\n\nKind regards,\nSCT");
+  assert.equal(appendEmailSignature("No signature here.", ""), "No signature here.");
 });

@@ -69,6 +69,7 @@ export type AppSettings = {
   smtpFromName: string;
   smtpFromEmail: string;
   smtpReplyToEmail: string;
+  emailSignature: string;
   smtpAuthMethod: string;
   smtpUsernameEnv: string;
   smtpPasswordEnv: string;
@@ -136,6 +137,7 @@ export const defaultSettings: AppSettings = {
   smtpFromName: "Sunset Country Tech",
   smtpFromEmail: "hello@sunsetcountry.tech",
   smtpReplyToEmail: "hello@sunsetcountry.tech",
+  emailSignature: "Kind regards,\nSunset Country Tech\nRepairs | IT Support | Tutoring | Installations\nhello@sunsetcountry.tech",
   smtpAuthMethod: "login",
   smtpUsernameEnv: "SMTP_USERNAME",
   smtpPasswordEnv: "SMTP_PASSWORD",
