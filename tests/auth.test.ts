@@ -38,6 +38,35 @@ test("single staff env with base64 hash overrides bundled JSON", async () => {
   restoreEnv("INTERNAL_USERS_JSON", previousJson);
 });
 
+test("single staff env tolerates a pasted base64 assignment", async () => {
+  const previousEmail = process.env.STAFF_EMAIL;
+  const previousHash = process.env.STAFF_PASSWORD_HASH_B64;
+  process.env.STAFF_EMAIL = "admin@example.test";
+  process.env.STAFF_PASSWORD_HASH_B64 = `STAFF_PASSWORD_HASH_B64=${Buffer.from("$2b$12$AaTOUWJQBb1KpyNpA0uOlurGrPr43.67hJpHCFI/vUx734nNy.1.i", "utf8").toString("base64")}`;
+
+  const user = await verifyStaffCredentials("admin@example.test", "sunset-demo-2026");
+
+  assert.equal(user?.email, "admin@example.test");
+  restoreEnv("STAFF_EMAIL", previousEmail);
+  restoreEnv("STAFF_PASSWORD_HASH_B64", previousHash);
+});
+
+test("single staff env accepts raw bcrypt hash when supplied", async () => {
+  const previousEmail = process.env.STAFF_EMAIL;
+  const previousHash = process.env.STAFF_PASSWORD_HASH;
+  const previousB64 = process.env.STAFF_PASSWORD_HASH_B64;
+  process.env.STAFF_EMAIL = "admin@example.test";
+  process.env.STAFF_PASSWORD_HASH = "$2b$12$AaTOUWJQBb1KpyNpA0uOlurGrPr43.67hJpHCFI/vUx734nNy.1.i";
+  delete process.env.STAFF_PASSWORD_HASH_B64;
+
+  const user = await verifyStaffCredentials("admin@example.test", "sunset-demo-2026");
+
+  assert.equal(user?.email, "admin@example.test");
+  restoreEnv("STAFF_EMAIL", previousEmail);
+  restoreEnv("STAFF_PASSWORD_HASH", previousHash);
+  restoreEnv("STAFF_PASSWORD_HASH_B64", previousB64);
+});
+
 test("sessions are signed and reject tampering", async () => {
   const token = await signSession({ sub: "u1", email: "a@example.test", name: "A", role: "Owner", iat: Date.now(), exp: Date.now() + 60_000, jti: createSessionId() }, getAuthSecret());
   assert.equal((await verifySession(token, getAuthSecret()))?.sub, "u1");

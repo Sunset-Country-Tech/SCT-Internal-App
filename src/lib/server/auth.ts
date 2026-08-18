@@ -29,16 +29,33 @@ const devOwner: StaffUser = {
   active: true,
 };
 
+function stripEnvAssignment(value: string) {
+  return value.replace(/^STAFF_PASSWORD_HASH_B64=/, "").replace(/^STAFF_PASSWORD_HASH=/, "").trim();
+}
+
 function decodeBase64(value: string) {
   try {
-    return Buffer.from(value, "base64").toString("utf8");
+    return Buffer.from(stripEnvAssignment(value), "base64").toString("utf8");
   } catch {
     return "";
   }
 }
 
+function normalizePasswordHash(value: string | undefined, encoded: boolean) {
+  if (!value) {
+    return "";
+  }
+  const normalized = stripEnvAssignment(value);
+  if (normalized.startsWith("$2")) {
+    return normalized;
+  }
+  return encoded ? decodeBase64(normalized) : normalized;
+}
+
 function configuredSingleStaffUser() {
-  const passwordHash = process.env.STAFF_PASSWORD_HASH_B64 ? decodeBase64(process.env.STAFF_PASSWORD_HASH_B64) : process.env.STAFF_PASSWORD_HASH;
+  const passwordHash = process.env.STAFF_PASSWORD_HASH_B64
+    ? normalizePasswordHash(process.env.STAFF_PASSWORD_HASH_B64, true)
+    : normalizePasswordHash(process.env.STAFF_PASSWORD_HASH, false);
   if (!passwordHash) {
     return null;
   }

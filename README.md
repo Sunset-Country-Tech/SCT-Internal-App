@@ -60,6 +60,19 @@ STAFF_PASSWORD_HASH_B64="paste-the-generated-base64-value"
 
 These `STAFF_*` variables override `INTERNAL_USERS_JSON` and avoid `$` escaping issues in bcrypt hashes.
 
+Verify a password/hash pair before restarting Docker:
+
+```bash
+npm run auth:verify-password -- "your-password" "paste-the-base64-value-or-bcrypt-hash"
+```
+
+Verify what the running Docker container sees:
+
+```bash
+docker compose exec app npm run auth:verify-password -- "your-password"
+docker compose exec app printenv STAFF_EMAIL
+```
+
 For production Docker deployments, override at least:
 
 - `AUTH_SECRET`

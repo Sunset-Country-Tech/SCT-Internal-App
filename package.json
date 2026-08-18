@@ -12,7 +12,8 @@
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
-    "auth:hash-password": "node scripts/hash-password.mjs"
+    "auth:hash-password": "node scripts/hash-password.mjs",
+    "auth:verify-password": "node scripts/verify-password.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
