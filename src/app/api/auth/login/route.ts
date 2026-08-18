@@ -1,6 +1,6 @@
 import { AUTH_COOKIE, createSessionId, getAuthSecret, signSession, verifyCsrfToken } from "@/lib/auth-cookie";
 import { loginSchema, safeReturnTo, verifyStaffCredentials } from "@/lib/server/auth";
-import { relativeRedirect, shouldSetSecureCookie } from "@/lib/server/http";
+import { relativeRedirect, sameOriginRequest, shouldSetSecureCookie } from "@/lib/server/http";
 import { currentTimeMs } from "@/lib/server/time";
 
 export const runtime = "nodejs";
@@ -18,19 +18,6 @@ function rateLimited(key: string) {
   return current.count > 8;
 }
 
-function sameOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) {
-    return true;
-  }
-
-  const requestOrigin = new URL(request.url).origin;
-  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  const forwardedProto = request.headers.get("x-forwarded-proto") ?? new URL(request.url).protocol.replace(":", "");
-  const forwardedOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : requestOrigin;
-  return origin === requestOrigin || origin === forwardedOrigin;
-}
-
 export async function POST(request: Request) {
   const formData = await request.formData();
   const parsed = loginSchema.safeParse({
@@ -40,7 +27,7 @@ export async function POST(request: Request) {
     returnTo: safeReturnTo(formData.get("returnTo")),
   });
 
-  if (!parsed.success || !sameOrigin(request) || !(await verifyCsrfToken(parsed.data.csrfToken, getAuthSecret()))) {
+  if (!parsed.success || !sameOriginRequest(request) || !(await verifyCsrfToken(parsed.data.csrfToken, getAuthSecret()))) {
     return relativeRedirect("/login?error=1");
   }
 

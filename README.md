@@ -48,7 +48,8 @@ For production Docker deployments, override at least:
 - `AUTH_SECRET`
 - `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PASSWORD` when using the bundled Docker database.
 - `INTERNAL_USERS_JSON`
-- `NEXT_PUBLIC_SITE_URL` if you deploy behind a public hostname.
+- `NEXT_PUBLIC_SITE_URL` if you deploy behind a public hostname, for example `https://internal.example.com`.
+- `AUTH_COOKIE_SECURE=true` when the public hostname uses HTTPS.
 
 Compose always points the app at the bundled database service with an internal URL like `postgresql://...@db:5432/...`. The top-level `DATABASE_URL` in `.env.example` is for local non-Docker development or for running the standalone image.
 
@@ -78,6 +79,8 @@ docker run --rm -p 3000:3000 \
 Set `SKIP_DB_MIGRATE=1` if migrations are handled by your deployment pipeline.
 
 The app uses relative redirects for login/logout so it stays on whichever address you open, such as `http://192.168.1.20:3000`.
+
+When deploying behind a reverse proxy or domain, make sure `NEXT_PUBLIC_SITE_URL` exactly matches the browser URL origin. The login CSRF origin check allows that configured origin even if Docker receives the request internally as `http://app:3000`.
 
 ## Production Setup
 
