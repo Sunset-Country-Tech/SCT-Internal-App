@@ -10,4 +10,6 @@ const bcrypt = await import("bcryptjs").catch(() => {
   process.exit(1);
 });
 
-console.log(await bcrypt.hash(password, 12));
+const hash = await bcrypt.hash(password, 12);
+console.log(hash);
+console.log(`STAFF_PASSWORD_HASH_B64=${Buffer.from(hash, "utf8").toString("base64")}`);

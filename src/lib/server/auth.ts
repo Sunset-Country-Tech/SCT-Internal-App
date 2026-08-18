@@ -29,6 +29,30 @@ const devOwner: StaffUser = {
   active: true,
 };
 
+function decodeBase64(value: string) {
+  try {
+    return Buffer.from(value, "base64").toString("utf8");
+  } catch {
+    return "";
+  }
+}
+
+function configuredSingleStaffUser() {
+  const passwordHash = process.env.STAFF_PASSWORD_HASH_B64 ? decodeBase64(process.env.STAFF_PASSWORD_HASH_B64) : process.env.STAFF_PASSWORD_HASH;
+  if (!passwordHash) {
+    return null;
+  }
+
+  return staffUserSchema.parse({
+    id: process.env.STAFF_ID || "owner",
+    email: process.env.STAFF_EMAIL || "owner@sunsetcountry.tech",
+    name: process.env.STAFF_NAME || "Owner",
+    role: process.env.STAFF_ROLE || "Owner",
+    passwordHash,
+    active: process.env.STAFF_ACTIVE === "false" ? false : true,
+  });
+}
+
 export function safeReturnTo(value: unknown) {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
     return "/";
@@ -37,6 +61,11 @@ export function safeReturnTo(value: unknown) {
 }
 
 export function getStaffUsers() {
+  const singleStaffUser = configuredSingleStaffUser();
+  if (singleStaffUser) {
+    return [singleStaffUser];
+  }
+
   const raw = process.env.INTERNAL_USERS_JSON;
   if (!raw) {
     if (process.env.NODE_ENV === "production") {

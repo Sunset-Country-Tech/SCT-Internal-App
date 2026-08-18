@@ -49,6 +49,17 @@ To use your own staff password in Docker, set `INTERNAL_USERS_JSON` in `.env`. C
 npm run auth:hash-password -- "your-password"
 ```
 
+The safer Docker option is to use the base64 hash line printed by that command:
+
+```bash
+STAFF_EMAIL="owner@sunsetcountry.tech"
+STAFF_NAME="Owner"
+STAFF_ROLE="Owner"
+STAFF_PASSWORD_HASH_B64="paste-the-generated-base64-value"
+```
+
+These `STAFF_*` variables override `INTERNAL_USERS_JSON` and avoid `$` escaping issues in bcrypt hashes.
+
 For production Docker deployments, override at least:
 
 - `AUTH_SECRET`

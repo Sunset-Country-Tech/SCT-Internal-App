@@ -28,6 +28,11 @@ services:
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       AUTH_SECRET: ${AUTH_SECRET:-docker-dev-change-this-secret-before-production}
       INTERNAL_USERS_JSON: ${INTERNAL_USERS_JSON:-'[{"id":"owner","email":"owner@sunsetcountry.tech","name":"Owner","role":"Owner","passwordHash":"$$2b$$12$$AaTOUWJQBb1KpyNpA0uOlurGrPr43.67hJpHCFI/vUx734nNy.1.i"}]'}
+      STAFF_EMAIL: ${STAFF_EMAIL:-}
+      STAFF_NAME: ${STAFF_NAME:-}
+      STAFF_ROLE: ${STAFF_ROLE:-}
+      STAFF_PASSWORD_HASH: ${STAFF_PASSWORD_HASH:-}
+      STAFF_PASSWORD_HASH_B64: ${STAFF_PASSWORD_HASH_B64:-}
       PUBLIC_INTAKE_SECRET: ${PUBLIC_INTAKE_SECRET:-docker-dev-public-intake-secret}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-none}
       EMAIL_MODE: ${EMAIL_MODE:-outbound-only}

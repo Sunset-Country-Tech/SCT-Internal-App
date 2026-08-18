@@ -10,6 +10,10 @@ const rootEnvNames = [
   "AUTH_SECRET",
   "AUTH_COOKIE_SECURE",
   "INTERNAL_USERS_JSON",
+  "STAFF_EMAIL",
+  "STAFF_NAME",
+  "STAFF_ROLE",
+  "STAFF_PASSWORD_HASH_B64",
   "PUBLIC_INTAKE_SECRET",
   "POSTGRES_DB",
   "POSTGRES_USER",
@@ -57,4 +61,5 @@ test("docker compose allows staff users to be overridden from env", () => {
   const compose = readFileSync("docker-compose.yml", "utf8");
 
   assert.match(compose, /INTERNAL_USERS_JSON: \$\{INTERNAL_USERS_JSON:-/);
+  assert.match(compose, /STAFF_PASSWORD_HASH_B64: \$\{STAFF_PASSWORD_HASH_B64:-\}/);
 });
