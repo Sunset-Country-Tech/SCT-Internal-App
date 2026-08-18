@@ -46,9 +46,18 @@ Docker Compose includes a local Postgres database and runs Prisma migrations on 
 For production Docker deployments, override at least:
 
 - `AUTH_SECRET`
-- `DATABASE_URL`
+- `POSTGRES_DB`, `POSTGRES_USER` and `POSTGRES_PASSWORD` when using the bundled Docker database.
 - `INTERNAL_USERS_JSON`
 - `NEXT_PUBLIC_SITE_URL` if you deploy behind a public hostname.
+
+Compose always points the app at the bundled database service with an internal URL like `postgresql://...@db:5432/...`. The top-level `DATABASE_URL` in `.env.example` is for local non-Docker development or for running the standalone image.
+
+If you changed `POSTGRES_USER`, `POSTGRES_PASSWORD` or `POSTGRES_DB` after the Docker database volume was first created, Postgres will keep the old credentials inside the existing volume. For a fresh local Docker database, reset the volume:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
 
 Build just the app image:
 

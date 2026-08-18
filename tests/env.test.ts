@@ -42,3 +42,12 @@ test("docker compose passes every mail setting env var into the app container", 
     assert.match(compose, new RegExp(`${name}: \\$\\{${name}:-`), `${name} is missing from docker-compose.yml`);
   }
 });
+
+test("docker compose app uses the bundled database service", () => {
+  const compose = readFileSync("docker-compose.yml", "utf8");
+
+  assert.match(compose, /DATABASE_URL: postgresql:\/\/\$\{POSTGRES_USER:-sct\}:\$\{POSTGRES_PASSWORD:-sct_dev_password\}@db:5432\/\$\{POSTGRES_DB:-sct_internal\}/);
+  assert.match(compose, /pg_isready/);
+  assert.match(compose, /\$\$\{POSTGRES_USER\}/);
+  assert.match(compose, /\$\$\{POSTGRES_DB\}/);
+});
