@@ -60,13 +60,29 @@ export type AppSettings = {
     threeDPrinting: string;
   };
   emailProvider: string;
+  emailMode: string;
   smtpHost: string;
   smtpPort: number;
+  smtpSecurity: string;
   smtpSecure: boolean;
+  smtpRequireTls: boolean;
   smtpFromName: string;
   smtpFromEmail: string;
+  smtpReplyToEmail: string;
+  smtpAuthMethod: string;
   smtpUsernameEnv: string;
   smtpPasswordEnv: string;
+  imapEnabled: boolean;
+  imapHost: string;
+  imapPort: number;
+  imapSecurity: string;
+  imapSecure: boolean;
+  imapUsernameEnv: string;
+  imapPasswordEnv: string;
+  imapInboxMailbox: string;
+  imapProcessedMailbox: string;
+  imapErrorMailbox: string;
+  imapPollingMinutes: number;
   smsProvider: string;
   smsGatewayUrl: string;
   smsSenderId: string;
@@ -111,13 +127,29 @@ export const defaultSettings: AppSettings = {
     threeDPrinting: "3DP-SCT",
   },
   emailProvider: "none",
+  emailMode: "outbound-only",
   smtpHost: "",
   smtpPort: 587,
+  smtpSecurity: "starttls",
   smtpSecure: false,
+  smtpRequireTls: true,
   smtpFromName: "Sunset Country Tech",
   smtpFromEmail: "hello@sunsetcountry.tech",
+  smtpReplyToEmail: "hello@sunsetcountry.tech",
+  smtpAuthMethod: "login",
   smtpUsernameEnv: "SMTP_USERNAME",
   smtpPasswordEnv: "SMTP_PASSWORD",
+  imapEnabled: false,
+  imapHost: "",
+  imapPort: 993,
+  imapSecurity: "ssl-tls",
+  imapSecure: true,
+  imapUsernameEnv: "IMAP_USERNAME",
+  imapPasswordEnv: "IMAP_PASSWORD",
+  imapInboxMailbox: "INBOX",
+  imapProcessedMailbox: "Processed",
+  imapErrorMailbox: "Needs Review",
+  imapPollingMinutes: 5,
   smsProvider: "none",
   smsGatewayUrl: "",
   smsSenderId: "SCT",
@@ -143,6 +175,11 @@ export function normalizeSettings(value: unknown): AppSettings {
   }
 
   const partial = value as Partial<AppSettings>;
+  const numberOrDefault = (candidate: unknown, fallback: number) => (typeof candidate === "number" && Number.isFinite(candidate) ? candidate : fallback);
+  const booleanOrDefault = (candidate: unknown, fallback: boolean) => (typeof candidate === "boolean" ? candidate : fallback);
+  const smtpSecurity = typeof partial.smtpSecurity === "string" ? partial.smtpSecurity : defaultSettings.smtpSecurity;
+  const imapSecurity = typeof partial.imapSecurity === "string" ? partial.imapSecurity : defaultSettings.imapSecurity;
+
   return {
     ...defaultSettings,
     ...partial,
@@ -154,12 +191,20 @@ export function normalizeSettings(value: unknown): AppSettings {
       ...defaultSettings.numbering,
       ...(partial.numbering && typeof partial.numbering === "object" ? partial.numbering : {}),
     },
-    smtpPort: typeof partial.smtpPort === "number" ? partial.smtpPort : defaultSettings.smtpPort,
-    smtpSecure: typeof partial.smtpSecure === "boolean" ? partial.smtpSecure : defaultSettings.smtpSecure,
-    gstRate: typeof partial.gstRate === "number" ? partial.gstRate : defaultSettings.gstRate,
-    labourRate: typeof partial.labourRate === "number" ? partial.labourRate : defaultSettings.labourRate,
-    travelRate: typeof partial.travelRate === "number" ? partial.travelRate : defaultSettings.travelRate,
-    gstRegistered: typeof partial.gstRegistered === "boolean" ? partial.gstRegistered : defaultSettings.gstRegistered,
+    smtpPort: numberOrDefault(partial.smtpPort, defaultSettings.smtpPort),
+    smtpSecurity,
+    smtpSecure: smtpSecurity === "ssl-tls" ? true : booleanOrDefault(partial.smtpSecure, false),
+    smtpRequireTls: booleanOrDefault(partial.smtpRequireTls, defaultSettings.smtpRequireTls),
+    smtpReplyToEmail: partial.smtpReplyToEmail ?? partial.smtpFromEmail ?? defaultSettings.smtpReplyToEmail,
+    imapEnabled: booleanOrDefault(partial.imapEnabled, defaultSettings.imapEnabled),
+    imapPort: numberOrDefault(partial.imapPort, defaultSettings.imapPort),
+    imapSecurity,
+    imapSecure: imapSecurity === "ssl-tls" ? true : booleanOrDefault(partial.imapSecure, false),
+    imapPollingMinutes: numberOrDefault(partial.imapPollingMinutes, defaultSettings.imapPollingMinutes),
+    gstRate: numberOrDefault(partial.gstRate, defaultSettings.gstRate),
+    labourRate: numberOrDefault(partial.labourRate, defaultSettings.labourRate),
+    travelRate: numberOrDefault(partial.travelRate, defaultSettings.travelRate),
+    gstRegistered: booleanOrDefault(partial.gstRegistered, defaultSettings.gstRegistered),
   };
 }
 

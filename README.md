@@ -78,11 +78,12 @@ Set:
 - `DATABASE_URL`
 - `INTERNAL_USERS_JSON`
 - SMTP secrets such as `SMTP_USERNAME` and `SMTP_PASSWORD` if SMTP is enabled.
+- IMAP secrets such as `IMAP_USERNAME` and `IMAP_PASSWORD` if inbound mail intake is enabled.
 - SMS secrets such as `SMS_API_KEY` and `SMS_WEBHOOK_SECRET` if SMS is enabled.
 - Calendar secrets such as `CALENDAR_API_KEY` if calendar sync is enabled.
 - Storage secrets such as `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` if R2/S3 storage is enabled.
 
-The Settings page stores provider choices, endpoints, sender details, bucket names and the names of secret environment variables. It does not store secret values in browser storage.
+The Settings page stores provider choices, SMTP/IMAP hosts and ports, TLS modes, mailbox names, sender details, bucket names and the names of secret environment variables. It does not store secret values in browser storage.
 
 Generate a staff password hash:
 

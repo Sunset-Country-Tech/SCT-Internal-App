@@ -25,6 +25,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="text-sm font-bold text-slate-800">{label}<div className="mt-1">{children}</div></label>;
 }
 
+function numberValue(value: string, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function ListEditor({
   title,
   value,
@@ -75,6 +80,11 @@ export function SettingsPanel({ role, settings, onChange }: Props) {
 
   function set<Key extends keyof AppSettings>(key: Key, value: AppSettings[Key]) {
     onChange({ ...settings, [key]: value });
+    setSaved("");
+  }
+
+  function setMany(value: Partial<AppSettings>) {
+    onChange({ ...settings, ...value });
     setSaved("");
   }
 
@@ -147,17 +157,45 @@ export function SettingsPanel({ role, settings, onChange }: Props) {
           </div> : null}
           {tab === "Integrations" ? <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-[8px] border border-slate-200 p-4 md:col-span-2">
-              <p className="font-black">SMTP email</p>
-              <p className="mt-1 text-xs text-slate-500">Store passwords as environment secrets. This page stores host, ports, sender details, and the env var names to read.</p>
-              <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <Field label="Email provider"><Select disabled={!canWrite} value={settings.emailProvider} onChange={(event) => set("emailProvider", event.target.value)}><option>none</option><option>smtp</option><option>api</option></Select></Field>
-                <Field label="SMTP host"><Input disabled={!canWrite} value={settings.smtpHost} onChange={(event) => set("smtpHost", event.target.value)} placeholder="smtp.example.com" /></Field>
-                <Field label="SMTP port"><Input disabled={!canWrite} type="number" value={settings.smtpPort} onChange={(event) => set("smtpPort", Number(event.target.value))} /></Field>
-                <label className="flex items-center gap-3 rounded-[8px] border border-slate-200 p-3 text-sm font-black"><input disabled={!canWrite} type="checkbox" checked={settings.smtpSecure} onChange={(event) => set("smtpSecure", event.target.checked)} className="h-5 w-5 accent-[#ff8a00]" /> Use TLS/SSL</label>
+              <p className="font-black">Email accounts</p>
+              <p className="mt-1 text-xs text-slate-500">Configure outbound SMTP and inbound IMAP here. Secret values stay in environment variables; this page stores hosts, ports, security modes, sender details, mailbox names, and env var names.</p>
+              <div className="mt-4 grid gap-4 md:grid-cols-4">
+                <Field label="Email provider"><Select disabled={!canWrite} value={settings.emailProvider} onChange={(event) => set("emailProvider", event.target.value)}><option>none</option><option>smtp-imap</option><option>smtp</option><option>api</option><option>microsoft-365</option><option>google-workspace</option></Select></Field>
+                <Field label="Email mode"><Select disabled={!canWrite} value={settings.emailMode} onChange={(event) => set("emailMode", event.target.value)}><option>outbound-only</option><option>inbound-only</option><option>inbound-and-outbound</option></Select></Field>
                 <Field label="From name"><Input disabled={!canWrite} value={settings.smtpFromName} onChange={(event) => set("smtpFromName", event.target.value)} /></Field>
                 <Field label="From email"><Input disabled={!canWrite} type="email" value={settings.smtpFromEmail} onChange={(event) => set("smtpFromEmail", event.target.value)} /></Field>
-                <Field label="Username env var"><Input disabled={!canWrite} value={settings.smtpUsernameEnv} onChange={(event) => set("smtpUsernameEnv", event.target.value)} /></Field>
-                <Field label="Password env var"><Input disabled={!canWrite} value={settings.smtpPasswordEnv} onChange={(event) => set("smtpPasswordEnv", event.target.value)} /></Field>
+                <Field label="Reply-to email"><Input disabled={!canWrite} type="email" value={settings.smtpReplyToEmail} onChange={(event) => set("smtpReplyToEmail", event.target.value)} /></Field>
+              </div>
+            </div>
+
+            <div className="rounded-[8px] border border-slate-200 p-4 md:col-span-2">
+              <p className="font-black">SMTP outbound mail</p>
+              <div className="mt-4 grid gap-4 md:grid-cols-4">
+                <Field label="SMTP host"><Input disabled={!canWrite} value={settings.smtpHost} onChange={(event) => set("smtpHost", event.target.value)} placeholder="smtp.example.com" /></Field>
+                <Field label="SMTP port"><Input disabled={!canWrite} type="number" min="1" max="65535" value={settings.smtpPort} onChange={(event) => set("smtpPort", numberValue(event.target.value, settings.smtpPort))} /></Field>
+                <Field label="SMTP security"><Select disabled={!canWrite} value={settings.smtpSecurity} onChange={(event) => { const value = event.target.value; setMany({ smtpSecurity: value, smtpSecure: value === "ssl-tls" }); }}><option value="starttls">STARTTLS on 587</option><option value="ssl-tls">SSL/TLS on 465</option><option value="none">None</option></Select></Field>
+                <Field label="SMTP auth"><Select disabled={!canWrite} value={settings.smtpAuthMethod} onChange={(event) => set("smtpAuthMethod", event.target.value)}><option>login</option><option>plain</option><option>oauth2</option><option>none</option></Select></Field>
+                <label className="flex items-center gap-3 rounded-[8px] border border-slate-200 p-3 text-sm font-black"><input disabled={!canWrite} type="checkbox" checked={settings.smtpRequireTls} onChange={(event) => set("smtpRequireTls", event.target.checked)} className="h-5 w-5 accent-[#ff8a00]" /> Require TLS when available</label>
+                <label className="flex items-center gap-3 rounded-[8px] border border-slate-200 p-3 text-sm font-black"><input disabled={!canWrite || settings.smtpSecurity === "ssl-tls"} type="checkbox" checked={settings.smtpSecure} onChange={(event) => set("smtpSecure", event.target.checked)} className="h-5 w-5 accent-[#ff8a00]" /> Secure socket</label>
+                <Field label="SMTP username env var"><Input disabled={!canWrite} value={settings.smtpUsernameEnv} onChange={(event) => set("smtpUsernameEnv", event.target.value)} /></Field>
+                <Field label="SMTP password env var"><Input disabled={!canWrite} value={settings.smtpPasswordEnv} onChange={(event) => set("smtpPasswordEnv", event.target.value)} /></Field>
+              </div>
+            </div>
+
+            <div className="rounded-[8px] border border-slate-200 p-4 md:col-span-2">
+              <p className="font-black">IMAP inbound mail</p>
+              <div className="mt-4 grid gap-4 md:grid-cols-4">
+                <label className="flex items-center gap-3 rounded-[8px] border border-slate-200 p-3 text-sm font-black"><input disabled={!canWrite} type="checkbox" checked={settings.imapEnabled} onChange={(event) => set("imapEnabled", event.target.checked)} className="h-5 w-5 accent-[#ff8a00]" /> Enable IMAP intake</label>
+                <Field label="IMAP host"><Input disabled={!canWrite} value={settings.imapHost} onChange={(event) => set("imapHost", event.target.value)} placeholder="imap.example.com" /></Field>
+                <Field label="IMAP port"><Input disabled={!canWrite} type="number" min="1" max="65535" value={settings.imapPort} onChange={(event) => set("imapPort", numberValue(event.target.value, settings.imapPort))} /></Field>
+                <Field label="IMAP security"><Select disabled={!canWrite} value={settings.imapSecurity} onChange={(event) => { const value = event.target.value; setMany({ imapSecurity: value, imapSecure: value === "ssl-tls" }); }}><option value="ssl-tls">SSL/TLS on 993</option><option value="starttls">STARTTLS on 143</option><option value="none">None</option></Select></Field>
+                <label className="flex items-center gap-3 rounded-[8px] border border-slate-200 p-3 text-sm font-black"><input disabled={!canWrite || settings.imapSecurity === "ssl-tls"} type="checkbox" checked={settings.imapSecure} onChange={(event) => set("imapSecure", event.target.checked)} className="h-5 w-5 accent-[#ff8a00]" /> Secure socket</label>
+                <Field label="IMAP username env var"><Input disabled={!canWrite} value={settings.imapUsernameEnv} onChange={(event) => set("imapUsernameEnv", event.target.value)} /></Field>
+                <Field label="IMAP password env var"><Input disabled={!canWrite} value={settings.imapPasswordEnv} onChange={(event) => set("imapPasswordEnv", event.target.value)} /></Field>
+                <Field label="Polling minutes"><Input disabled={!canWrite} type="number" min="1" value={settings.imapPollingMinutes} onChange={(event) => set("imapPollingMinutes", numberValue(event.target.value, settings.imapPollingMinutes))} /></Field>
+                <Field label="Inbox mailbox"><Input disabled={!canWrite} value={settings.imapInboxMailbox} onChange={(event) => set("imapInboxMailbox", event.target.value)} /></Field>
+                <Field label="Processed mailbox"><Input disabled={!canWrite} value={settings.imapProcessedMailbox} onChange={(event) => set("imapProcessedMailbox", event.target.value)} /></Field>
+                <Field label="Review mailbox"><Input disabled={!canWrite} value={settings.imapErrorMailbox} onChange={(event) => set("imapErrorMailbox", event.target.value)} /></Field>
               </div>
             </div>
 
