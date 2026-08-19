@@ -10,6 +10,7 @@ import {
   type PublicContactIntakeRepository,
 } from "@/lib/public-contact-intake";
 import { prisma } from "@/lib/server/db";
+import { storeLocalJobImage } from "@/lib/server/local-storage";
 import { currentTimeMs } from "@/lib/server/time";
 
 export const runtime = "nodejs";
@@ -47,6 +48,28 @@ function prismaRepository(): PublicContactIntakeRepository {
     countJobs: () => prisma.job.count(),
     createJob: (input) => prisma.job.create({ data: input }),
     createJobNote: (input) => prisma.jobNote.create({ data: input }),
+    createJobAttachment: async ({ jobId, jobNumber, photo }) => {
+      if (!photo.file) {
+        throw new PublicContactIntakeError("Photo upload could not be saved.", 400);
+      }
+      const stored = await storeLocalJobImage(photo.file, jobNumber);
+      const attachment = await prisma.jobAttachment.create({
+        data: {
+          jobId,
+          originalName: stored.originalName,
+          storedName: stored.storedName,
+          relativePath: stored.relativePath,
+          mimeType: stored.mimeType,
+          size: stored.size,
+          source: "Public Website",
+        },
+      });
+      return {
+        id: attachment.id,
+        originalName: attachment.originalName,
+        url: `/api/job-attachments/${attachment.id}`,
+      };
+    },
     createAuditLog: (input) => prisma.auditLog.create({ data: { ...input, after: input.after as Prisma.InputJsonValue } }),
   };
 }

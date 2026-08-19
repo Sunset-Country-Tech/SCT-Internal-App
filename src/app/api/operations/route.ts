@@ -89,6 +89,7 @@ type DbJob = {
   dueAt: Date | null;
   description: string;
   notes: Array<{ id: string; body: string; visibility: string; createdAt: Date }>;
+  attachments: Array<{ id: string; originalName: string; mimeType: string; size: number; source: string; createdAt: Date }>;
 };
 
 type DbQuote = {
@@ -148,7 +149,7 @@ async function loadOperationsFromDb() {
     }),
     prisma.job.findMany({
       where: { deletedAt: null },
-      include: { customer: true, notes: { orderBy: { createdAt: "desc" } } },
+      include: { customer: true, notes: { orderBy: { createdAt: "desc" } }, attachments: { orderBy: { createdAt: "desc" } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.quote.findMany({
@@ -187,6 +188,15 @@ async function loadOperationsFromDb() {
         body: note.body,
         visibility: note.visibility,
         createdAt: note.createdAt.toLocaleString("en-AU"),
+      })),
+      attachments: job.attachments.map((attachment) => ({
+        id: attachment.id,
+        name: attachment.originalName,
+        url: `/api/job-attachments/${attachment.id}`,
+        mimeType: attachment.mimeType,
+        size: attachment.size,
+        source: attachment.source,
+        createdAt: attachment.createdAt.toLocaleString("en-AU"),
       })),
     })),
     quotes: dbQuotes.map((quote: DbQuote) => ({

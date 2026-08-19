@@ -124,7 +124,7 @@ Set:
 - IMAP secrets such as `IMAP_USERNAME` and `IMAP_PASSWORD` if inbound mail intake is enabled.
 - SMS secrets such as `SMS_API_KEY` and `SMS_WEBHOOK_SECRET` if SMS is enabled.
 - Calendar secrets such as `CALENDAR_API_KEY` if calendar sync is enabled.
-- Storage secrets such as `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` if R2/S3 storage is enabled.
+- `LOCAL_UPLOAD_DIR` for local uploaded job images, plus storage secrets such as `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` if R2/S3 storage is enabled.
 
 The Settings page stores provider choices, SMTP/IMAP hosts and ports, TLS modes, mailbox names, sender details, bucket names and the names of secret environment variables. It does not store secret values in browser storage.
 
@@ -181,7 +181,7 @@ or:
 { "ok": false, "message": "..." }
 ```
 
-Uploaded photo metadata is recorded on the intake job. Persisting uploaded photo files is intentionally marked as a TODO until the file storage backend is implemented.
+Uploaded photos are saved to local job image storage, recorded as job attachments, and shown inside the internal job detail page. Docker Compose mounts `/app/data/uploads` as a persistent `app-uploads` volume.
 
 Generate a staff password hash:
 

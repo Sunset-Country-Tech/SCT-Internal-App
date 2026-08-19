@@ -41,7 +41,8 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
 
 type CustomerRecord = (typeof seedCustomers)[number];
 type JobNoteRecord = { id: string; body: string; visibility: string; createdAt: string };
-type JobRecord = (typeof seedJobs)[number] & { notes?: JobNoteRecord[] };
+type JobAttachmentRecord = { id: string; name: string; url: string; mimeType: string; size: number; source: string; createdAt: string };
+type JobRecord = (typeof seedJobs)[number] & { notes?: JobNoteRecord[]; attachments?: JobAttachmentRecord[] };
 type QuoteRecord = (typeof seedQuotes)[number];
 type InvoiceRecord = (typeof seedInvoices)[number];
 type AppointmentRecord = (typeof seedAppointments)[number];
@@ -404,6 +405,44 @@ export function OperationsApp({ user }: Props) {
     showNotice("Note saved.");
   }
 
+  async function uploadJobImages(formData: FormData) {
+    if (!can(user.role, "jobs:write")) {
+      showNotice("Your role can view images but cannot upload them.");
+      return;
+    }
+    const jobNumber = String(formData.get("jobNumber") ?? "").trim();
+    const files = formData.getAll("images").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    if (!jobNumber || !files.length) {
+      showNotice("Choose images before uploading.");
+      return;
+    }
+
+    const uploadData = new FormData();
+    for (const file of files) {
+      uploadData.append("images", file);
+    }
+
+    try {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobNumber)}/attachments`, {
+        method: "POST",
+        body: uploadData,
+      });
+      const result = await response.json().catch(() => null) as { ok?: boolean; message?: string; attachments?: JobAttachmentRecord[] } | null;
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.message ?? "Images could not be uploaded.");
+      }
+      const attachments = result.attachments ?? [];
+      const next = jobRecords.map((job) => job.number === jobNumber ? { ...job, attachments: [...attachments, ...(job.attachments ?? [])] } : job);
+      setJobRecords(next);
+      saveRecords("sct-jobs", next);
+      setSelectedJobNumber(jobNumber);
+      addActivity("Job images uploaded", `${attachments.length} image${attachments.length === 1 ? "" : "s"} added to ${jobNumber}.`);
+      showNotice("Images uploaded.");
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : "Images could not be uploaded.");
+    }
+  }
+
   function createQuote(formData: FormData) {
     const customer = String(formData.get("customer") ?? customerRecords[0]?.name ?? "").trim();
     const job = String(formData.get("job") ?? jobRecords[0]?.number ?? "").trim();
@@ -719,6 +758,26 @@ export function OperationsApp({ user }: Props) {
                 <div className="grid gap-3">
                   {(selectedJob.notes ?? []).length ? (selectedJob.notes ?? []).map((note) => <div key={note.id} className="rounded-[8px] border border-slate-200 bg-slate-50 p-4"><div className="mb-2 flex flex-wrap items-center gap-2"><Badge>{note.visibility}</Badge><span className="text-xs font-bold text-slate-400">{note.createdAt}</span></div><p className="whitespace-pre-wrap text-sm text-slate-700">{note.body}</p></div>) : <p className="text-sm text-slate-600">No notes on this job yet.</p>}
                 </div>
+              </Panel>
+
+              <Panel title="Images & Files">
+                <form action={uploadJobImages} className="mb-4 grid gap-3 rounded-[8px] border border-slate-200 bg-slate-50 p-4">
+                  <input type="hidden" name="jobNumber" defaultValue={selectedJob.number} />
+                  <Field label="Add job images"><Input name="images" type="file" accept="image/png,image/jpeg,image/webp" multiple /></Field>
+                  <div className="flex justify-end"><button disabled={!can(user.role, "jobs:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white disabled:opacity-40"><Save className="h-4 w-4" /> Upload Images</button></div>
+                </form>
+                {(selectedJob.attachments ?? []).length ? <div className="grid gap-3 sm:grid-cols-2">
+                  {(selectedJob.attachments ?? []).map((attachment) => (
+                    <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-[8px] border border-slate-200 bg-slate-50 hover:border-[#ff8a00]">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- Protected attachment URLs rely on the browser session cookie. */}
+                      {attachment.mimeType.startsWith("image/") ? <img src={attachment.url} alt={attachment.name} className="aspect-video w-full object-cover" /> : <div className="grid aspect-video place-items-center bg-white text-sm font-black text-slate-500">File</div>}
+                      <div className="p-3">
+                        <p className="truncate text-sm font-black group-hover:text-[#ff8a00]">{attachment.name}</p>
+                        <p className="mt-1 text-xs font-bold text-slate-500">{Math.round(attachment.size / 1024)}KB - {attachment.source} - {attachment.createdAt}</p>
+                      </div>
+                    </a>
+                  ))}
+                </div> : <p className="text-sm text-slate-600">No images or files saved for this job yet. Public website photo uploads will appear here.</p>}
               </Panel>
 
               <Panel title="Communications">

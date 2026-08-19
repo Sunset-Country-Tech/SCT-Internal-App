@@ -15,6 +15,7 @@ const rootEnvNames = [
   "STAFF_ROLE",
   "STAFF_PASSWORD_HASH_B64",
   "PUBLIC_INTAKE_SECRET",
+  "LOCAL_UPLOAD_DIR",
   "POSTGRES_DB",
   "POSTGRES_USER",
   "POSTGRES_PASSWORD",
@@ -55,6 +56,14 @@ test("docker compose app uses the bundled database service", () => {
   assert.match(compose, /pg_isready/);
   assert.match(compose, /\$\$\{POSTGRES_USER\}/);
   assert.match(compose, /\$\$\{POSTGRES_DB\}/);
+});
+
+test("docker compose persists local uploaded files", () => {
+  const compose = readFileSync("docker-compose.yml", "utf8");
+
+  assert.match(compose, /LOCAL_UPLOAD_DIR: \$\{LOCAL_UPLOAD_DIR:-\/app\/data\/uploads\}/);
+  assert.match(compose, /app-uploads:\/app\/data\/uploads/);
+  assert.match(compose, /app-uploads:/);
 });
 
 test("docker compose allows staff users to be overridden from env", () => {

@@ -71,6 +71,7 @@ model Job {
   description String
   dueAt       DateTime?
   notes       JobNote[]
+  attachments JobAttachment[]
   quotes      Quote[]
   invoices    Invoice[]
   statusLog   JobStatusHistory[]
@@ -86,6 +87,21 @@ model JobNote {
   body      String
   visibility String
   createdAt DateTime @default(now())
+}
+
+model JobAttachment {
+  id           String   @id @default(cuid())
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id])
+  originalName String
+  storedName   String
+  relativePath String
+  mimeType     String
+  size         Int
+  source       String
+  createdAt    DateTime @default(now())
+
+  @@index([jobId])
 }
 
 model JobStatusHistory {

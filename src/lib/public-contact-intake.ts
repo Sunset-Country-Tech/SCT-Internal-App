@@ -36,10 +36,11 @@ export const publicContactIntakeSchema = z.object({
 });
 
 export type PublicContactIntakeInput = z.infer<typeof publicContactIntakeSchema>;
-export type PublicContactPhoto = { name: string; type: string; size: number };
+export type PublicContactPhoto = { name: string; type: string; size: number; file?: File };
 export type PublicContactCustomer = { id: string; customerNumber: string; name: string; email: string | null; phone: string | null; serviceArea: string | null };
 export type PublicContactJob = { id: string; jobNumber: string };
 export type PublicContactAudit = { id: string };
+export type PublicContactAttachment = { id: string; originalName: string; url: string };
 
 export type PublicContactIntakeRepository = {
   findCustomer: (email: string, phone: string) => Promise<PublicContactCustomer | null>;
@@ -48,6 +49,7 @@ export type PublicContactIntakeRepository = {
   countJobs: () => Promise<number>;
   createJob: (input: { jobNumber: string; customerId: string; type: string; status: string; priority: string; device: string; description: string }) => Promise<PublicContactJob>;
   createJobNote: (input: { jobId: string; body: string; visibility: string }) => Promise<{ id: string }>;
+  createJobAttachment?: (input: { jobId: string; jobNumber: string; photo: PublicContactPhoto }) => Promise<PublicContactAttachment>;
   createAuditLog: (input: { event: string; entityType: string; entityId: string; after: Record<string, unknown> }) => Promise<PublicContactAudit>;
 };
 
@@ -105,7 +107,7 @@ export function parsePublicContactFormData(formData: FormData) {
   if (photos.length > maxPhotos) {
     throw new PublicContactIntakeError("Too many photos uploaded.", 400);
   }
-  const photoMetadata = photos.map((photo) => ({ name: photo.name, type: photo.type, size: photo.size }));
+  const photoMetadata = photos.map((photo) => ({ name: photo.name, type: photo.type, size: photo.size, file: photo }));
   if (photoMetadata.some((photo) => !imageTypes.has(photo.type) || photo.size > maxPhotoSize)) {
     throw new PublicContactIntakeError("Photos must be PNG, JPEG, or WebP files under 5MB.", 400);
   }
@@ -129,9 +131,11 @@ export function buildPublicContactJobDescription(input: PublicContactIntakeInput
     "",
     "Photo uploads:",
     photoLines,
-    "",
-    "TODO: Persist uploaded photo files when file storage is implemented.",
   ].join("\n");
+}
+
+function photoAuditMetadata(photo: PublicContactPhoto) {
+  return { name: photo.name, type: photo.type, size: photo.size };
 }
 
 export async function createPublicContactIntake(repo: PublicContactIntakeRepository, input: PublicContactIntakeInput, photos: PublicContactPhoto[], sourceIp: string, now = new Date()) {
@@ -165,6 +169,19 @@ export async function createPublicContactIntake(repo: PublicContactIntakeReposit
     body: `Public Website intake from ${input.name} <${input.email}>. Preferred support: ${input.preferredSupport}. Source IP: ${sourceIp}.`,
   });
 
+  const attachments = repo.createJobAttachment
+    ? await Promise.all(photos.map((photo) => repo.createJobAttachment?.({ jobId: job.id, jobNumber: job.jobNumber, photo })))
+    : [];
+
+  const savedAttachments = attachments.filter((attachment): attachment is PublicContactAttachment => Boolean(attachment));
+  if (savedAttachments.length) {
+    await repo.createJobNote({
+      jobId: job.id,
+      visibility: "Internal",
+      body: `Saved ${savedAttachments.length} public website photo upload${savedAttachments.length === 1 ? "" : "s"}:\n${savedAttachments.map((attachment) => `- ${attachment.originalName}: ${attachment.url}`).join("\n")}`,
+    });
+  }
+
   const audit = await repo.createAuditLog({
     event: "Public website contact intake",
     entityType: "Job",
@@ -176,7 +193,8 @@ export async function createPublicContactIntake(repo: PublicContactIntakeReposit
       service: input.service,
       preferredSupport: input.preferredSupport,
       device: input.device,
-      photoUploads: photos,
+      photoUploads: photos.map(photoAuditMetadata),
+      attachments: savedAttachments,
     },
   });
 

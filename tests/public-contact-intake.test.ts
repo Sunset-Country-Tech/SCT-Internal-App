@@ -36,6 +36,7 @@ function fakeRepository() {
     updateCustomer: [],
     createJob: [],
     createJobNote: [],
+    createJobAttachment: [],
     createAuditLog: [],
   };
   const repo: PublicContactIntakeRepository = {
@@ -57,12 +58,21 @@ function fakeRepository() {
       calls.createJobNote.push(input);
       return { id: "note_1" };
     },
+    createJobAttachment: async (input) => {
+      calls.createJobAttachment.push(input);
+      return { id: "attachment_1", originalName: input.photo.name, url: `/api/job-attachments/attachment_1` };
+    },
     createAuditLog: async (input) => {
       calls.createAuditLog.push(input);
       return { id: "audit_1" };
     },
   };
   return { repo, calls };
+}
+
+function addPhoto(formData: FormData) {
+  formData.append("photos", new File([new Uint8Array([137, 80, 78, 71])], "slow-laptop.png", { type: "image/png" }));
+  return formData;
 }
 
 test("valid public contact submission creates intake job records", async () => {
@@ -78,6 +88,21 @@ test("valid public contact submission creates intake job records", async () => {
   assert.match((calls.createJob[0] as { description: string }).description, /Source: Public Website/);
   assert.equal(calls.createJobNote.length, 1);
   assert.equal(calls.createAuditLog.length, 1);
+});
+
+test("valid public contact submission stores uploaded photo attachments", async () => {
+  const { input, photos } = parsePublicContactFormData(addPhoto(validFormData()));
+  const { repo, calls } = fakeRepository();
+
+  await createPublicContactIntake(repo, input, photos, "203.0.113.10", new Date("2026-08-18T00:00:00.000Z"));
+
+  assert.equal(photos.length, 1);
+  assert.equal(photos[0].file?.name, "slow-laptop.png");
+  assert.equal(calls.createJobAttachment.length, 1);
+  assert.equal((calls.createJobAttachment[0] as { photo: { name: string } }).photo.name, "slow-laptop.png");
+  assert.equal(calls.createJobNote.length, 2);
+  assert.match((calls.createJobNote[1] as { body: string }).body, /Saved 1 public website photo upload/);
+  assert.doesNotMatch((calls.createJob[0] as { description: string }).description, /TODO/);
 });
 
 test("missing shared public intake secret is rejected", async () => {
