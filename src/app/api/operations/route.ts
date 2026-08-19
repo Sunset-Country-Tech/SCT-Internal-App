@@ -31,6 +31,11 @@ const jobSchema = z.object({
   next: z.string().min(1),
 });
 
+const jobNoteSchema = z.object({
+  body: z.string().min(1),
+  visibility: z.string().min(1).default("Internal"),
+});
+
 const quoteSchema = z.object({
   number: z.string().min(1),
   token: z.string().min(8),
@@ -56,6 +61,8 @@ const appointmentSchema = z.object({
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create-customer"), customer: customerSchema }),
   z.object({ action: z.literal("create-job"), job: jobSchema }),
+  z.object({ action: z.literal("update-job"), job: jobSchema }),
+  z.object({ action: z.literal("add-job-note"), jobNumber: z.string().min(1), note: jobNoteSchema }),
   z.object({ action: z.literal("create-quote"), quote: quoteSchema }),
   z.object({ action: z.literal("create-appointment"), appointment: appointmentSchema }),
   z.object({ action: z.literal("record-payment"), invoiceNumber: z.string().min(1), amount: z.number().positive() }),
@@ -81,6 +88,7 @@ type DbJob = {
   status: string;
   dueAt: Date | null;
   description: string;
+  notes: Array<{ id: string; body: string; visibility: string; createdAt: Date }>;
 };
 
 type DbQuote = {
@@ -140,7 +148,7 @@ async function loadOperationsFromDb() {
     }),
     prisma.job.findMany({
       where: { deletedAt: null },
-      include: { customer: true },
+      include: { customer: true, notes: { orderBy: { createdAt: "desc" } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.quote.findMany({
@@ -174,6 +182,12 @@ async function loadOperationsFromDb() {
       status: job.status,
       due: job.dueAt?.toISOString().slice(0, 10) ?? "",
       next: job.description,
+      notes: job.notes.map((note) => ({
+        id: note.id,
+        body: note.body,
+        visibility: note.visibility,
+        createdAt: note.createdAt.toLocaleString("en-AU"),
+      })),
     })),
     quotes: dbQuotes.map((quote: DbQuote) => ({
       number: quote.quoteNumber,
@@ -263,7 +277,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (input.action === "create-job") {
+    if (input.action === "create-job" || input.action === "update-job") {
       const customer = await findOrCreateCustomer(input.job.customer);
       await prisma.job.upsert({
         where: { jobNumber: input.job.number },
@@ -284,6 +298,20 @@ export async function POST(request: Request) {
           device: input.job.device,
           description: input.job.next,
           dueAt: input.job.due ? new Date(`${input.job.due}T00:00:00.000Z`) : null,
+        },
+      });
+    }
+
+    if (input.action === "add-job-note") {
+      const job = await prisma.job.findUnique({ where: { jobNumber: input.jobNumber } });
+      if (!job) {
+        return NextResponse.json({ error: "Job not found" }, { status: 404 });
+      }
+      await prisma.jobNote.create({
+        data: {
+          jobId: job.id,
+          body: input.note.body,
+          visibility: input.note.visibility,
         },
       });
     }

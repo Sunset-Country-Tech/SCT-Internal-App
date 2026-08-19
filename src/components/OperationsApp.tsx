@@ -40,13 +40,14 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
 }
 
 type CustomerRecord = (typeof seedCustomers)[number];
-type JobRecord = (typeof seedJobs)[number];
+type JobNoteRecord = { id: string; body: string; visibility: string; createdAt: string };
+type JobRecord = (typeof seedJobs)[number] & { notes?: JobNoteRecord[] };
 type QuoteRecord = (typeof seedQuotes)[number];
 type InvoiceRecord = (typeof seedInvoices)[number];
 type AppointmentRecord = (typeof seedAppointments)[number];
 type ModalMode = "job" | "customer" | "quote" | "appointment" | "payment" | "workflow" | "communication" | null;
 type ActivityRecord = { id: string; title: string; detail: string; createdAt: string };
-type CommunicationDraft = { customer: string; channel: "email" | "sms"; to: string; subject: string; body: string; templateId: string };
+type CommunicationDraft = { customer: string; channel: "email" | "sms"; to: string; subject: string; body: string; templateId: string; jobNumber?: string };
 type CommunicationRecord = CommunicationDraft & { id: string; status: string; fallbackUrl?: string; createdAt: string };
 type OperationsData = {
   customers: CustomerRecord[];
@@ -100,6 +101,7 @@ export function OperationsApp({ user }: Props) {
   const [modal, setModal] = useState<ModalMode>(null);
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
+  const [selectedJobNumber, setSelectedJobNumber] = useState(seedJobs[0]?.number ?? "");
   const [customerRecords, setCustomerRecords] = useState<CustomerRecord[]>(seedCustomers);
   const [jobRecords, setJobRecords] = useState<JobRecord[]>(seedJobs);
   const [quoteRecords, setQuoteRecords] = useState<QuoteRecord[]>(seedQuotes);
@@ -122,6 +124,12 @@ export function OperationsApp({ user }: Props) {
   const loweredQuery = query.toLowerCase();
   const filteredJobs = jobRecords.filter((job) => [job.number, job.customer, job.type, job.device, job.status].join(" ").toLowerCase().includes(loweredQuery));
   const filteredCustomers = customerRecords.filter((customer) => [customer.id, customer.name, customer.phone, customer.email, customer.area, customer.type].join(" ").toLowerCase().includes(loweredQuery));
+  const selectedJob = jobRecords.find((job) => job.number === selectedJobNumber) ?? filteredJobs[0] ?? jobRecords[0];
+  const selectedJobCustomer = selectedJob ? customerRecords.find((customer) => customer.name === selectedJob.customer) : undefined;
+  const selectedJobQuotes = selectedJob ? quoteRecords.filter((quote) => quote.job === selectedJob.number || quote.customer === selectedJob.customer) : [];
+  const selectedJobInvoices = selectedJob ? invoiceRecords.filter((invoice) => invoice.job === selectedJob.number || invoice.customer === selectedJob.customer) : [];
+  const selectedJobAppointments = selectedJob ? appointmentRecords.filter((appointment) => appointment.customer === selectedJob.customer || appointment.type === selectedJob.type) : [];
+  const selectedJobCommunications = selectedJob ? communicationRecords.filter((message) => message.jobNumber === selectedJob.number || message.customer === selectedJob.customer) : [];
   const newJobNumber = useMemo(() => nextNumber(settings.numbering.job, 2026, jobRecords.map((job) => job.number)), [settings.numbering.job, jobRecords]);
   const selectedCommunicationCustomer = useMemo(() => customerRecords.find((customer) => customer.name === communicationDraft.customer), [communicationDraft.customer, customerRecords]);
   const alertMessages = useMemo(() => [
@@ -198,6 +206,11 @@ export function OperationsApp({ user }: Props) {
     setAlertsOpen(false);
   }
 
+  function openJob(number: string) {
+    setSelectedJobNumber(number);
+    openSection("Jobs");
+  }
+
   function guardedOpen(mode: Exclude<ModalMode, null>, permission: Parameters<typeof can>[1]) {
     if (!can(user.role, permission)) {
       showNotice("Your role can view this area but cannot make that change.");
@@ -207,7 +220,7 @@ export function OperationsApp({ user }: Props) {
     setModal(mode);
   }
 
-  function openCommunication(customerName = customerRecords[0]?.name ?? "", channel: "email" | "sms" = "email") {
+  function openCommunication(customerName = customerRecords[0]?.name ?? "", channel: "email" | "sms" = "email", jobNumber?: string) {
     if (!can(user.role, "customers:write")) {
       showNotice("Your role can view communications but cannot send messages.");
       return;
@@ -220,6 +233,7 @@ export function OperationsApp({ user }: Props) {
       subject: "Update from Sunset Country Tech",
       body: "",
       templateId: "",
+      jobNumber,
     });
     setAlertsOpen(false);
     setModal("communication");
@@ -323,14 +337,71 @@ export function OperationsApp({ user }: Props) {
       status: settings.jobStatuses[0] ?? "New",
       due: String(formData.get("due") ?? ""),
       next: String(formData.get("next") ?? "Diagnose and update customer"),
+      notes: [],
     }, ...jobRecords];
     setJobRecords(next);
     saveRecords("sct-jobs", next);
     void syncOperation({ action: "create-job", job: next[0] });
+    setSelectedJobNumber(number);
     addActivity("Job created", `${number} opened for ${customer}.`);
     setModal(null);
     openSection("Jobs");
     showNotice(`${number} created.`);
+  }
+
+  function updateJob(formData: FormData) {
+    if (!can(user.role, "jobs:write")) {
+      showNotice("Your role can view jobs but cannot edit them.");
+      return;
+    }
+    const number = String(formData.get("number") ?? "").trim();
+    const existing = jobRecords.find((job) => job.number === number);
+    if (!existing) {
+      showNotice("Choose a job to edit.");
+      return;
+    }
+    const updated: JobRecord = {
+      ...existing,
+      customer: String(formData.get("customer") ?? existing.customer).trim(),
+      type: String(formData.get("type") ?? existing.type).trim(),
+      device: String(formData.get("device") ?? existing.device).trim(),
+      status: String(formData.get("status") ?? existing.status).trim(),
+      due: String(formData.get("due") ?? existing.due).trim(),
+      next: String(formData.get("next") ?? existing.next).trim(),
+    };
+    const next = jobRecords.map((job) => job.number === number ? updated : job);
+    setJobRecords(next);
+    saveRecords("sct-jobs", next);
+    setSelectedJobNumber(number);
+    void syncOperation({ action: "update-job", job: updated });
+    addActivity("Job updated", `${number} details changed.`);
+    showNotice(`${number} updated.`);
+  }
+
+  function addJobNote(formData: FormData) {
+    if (!can(user.role, "jobs:write")) {
+      showNotice("Your role can view notes but cannot add them.");
+      return;
+    }
+    const jobNumber = String(formData.get("jobNumber") ?? "").trim();
+    const body = String(formData.get("body") ?? "").trim();
+    const visibility = String(formData.get("visibility") ?? "Internal");
+    if (!jobNumber || !body) {
+      showNotice("Write a note before saving.");
+      return;
+    }
+    const note: JobNoteRecord = {
+      id: `NOTE-${Date.now()}`,
+      body,
+      visibility,
+      createdAt: new Date().toLocaleString("en-AU"),
+    };
+    const next = jobRecords.map((job) => job.number === jobNumber ? { ...job, notes: [note, ...(job.notes ?? [])] } : job);
+    setJobRecords(next);
+    saveRecords("sct-jobs", next);
+    void syncOperation({ action: "add-job-note", jobNumber, note });
+    addActivity("Job note added", `${jobNumber}: ${body.slice(0, 90)}`);
+    showNotice("Note saved.");
   }
 
   function createQuote(formData: FormData) {
@@ -427,6 +498,7 @@ export function OperationsApp({ user }: Props) {
       subject: String(formData.get("subject") ?? "").trim(),
       body: String(formData.get("body") ?? "").trim(),
       templateId: String(formData.get("templateId") ?? "").trim(),
+      jobNumber: String(formData.get("jobNumber") ?? "").trim() || undefined,
     };
     if (!draft.customer || !draft.to || !draft.body) {
       showNotice("Choose a customer, target, and message.");
@@ -456,8 +528,8 @@ export function OperationsApp({ user }: Props) {
     const next = [record, ...communicationRecords].slice(0, 50);
     setCommunicationRecords(next);
     saveRecords("sct-communications", next);
-    addActivity(status === "Sent" ? "Customer contacted" : "Communication drafted", `${draft.channel.toUpperCase()} for ${draft.customer}.`);
-    void syncOperation({ action: "draft-workflow", title: status === "Sent" ? "Customer contacted" : "Communication drafted", detail: `${draft.channel.toUpperCase()} for ${draft.customer}: ${draft.subject || draft.body.slice(0, 80)}` });
+    addActivity(status === "Sent" ? "Customer contacted" : "Communication drafted", `${draft.channel.toUpperCase()} for ${draft.customer}${draft.jobNumber ? ` on ${draft.jobNumber}` : ""}.`);
+    void syncOperation({ action: "draft-workflow", title: status === "Sent" ? "Customer contacted" : "Communication drafted", detail: `${draft.channel.toUpperCase()} for ${draft.customer}${draft.jobNumber ? ` on ${draft.jobNumber}` : ""}: ${draft.subject || draft.body.slice(0, 80)}` });
     setModal(null);
     openSection("Communications");
     showNotice(status === "Sent" ? "Message sent." : result.message ?? "Message saved as a draft.");
@@ -467,6 +539,7 @@ export function OperationsApp({ user }: Props) {
     const next = jobRecords.map((job) => job.number === number ? { ...job, status: "Completed", next: "Invoice or archive" } : job);
     setJobRecords(next);
     saveRecords("sct-jobs", next);
+    setSelectedJobNumber(number);
     void syncOperation({ action: "complete-job", jobNumber: number });
     addActivity("Job completed", `${number} marked completed.`);
     showNotice(`${number} marked completed.`);
@@ -505,7 +578,7 @@ export function OperationsApp({ user }: Props) {
     };
     const actions = moduleActions[active] ?? [];
 
-    return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-3">{actions.map(({ label, icon: Icon, run }) => <button key={label} onClick={run} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><Icon className="h-4 w-4" />{label}</button>)}</div><div className="grid gap-3">{jobRecords.filter((job) => job.type === active || (active === "Parts" && job.status.includes("Parts"))).slice(0, 6).map((job) => <div key={job.number} className="rounded-[8px] border border-slate-200 p-4"><p className="font-black">{job.number} - {job.customer}</p><p className="text-sm text-slate-600">{job.device} - {job.status}</p><p className="mt-2 text-sm text-slate-600">{job.next}</p></div>)}{!jobRecords.some((job) => job.type === active || (active === "Parts" && job.status.includes("Parts"))) ? <p className="text-sm text-slate-600">No active {active.toLowerCase()} jobs yet.</p> : null}</div></div>;
+    return <div className="space-y-4"><div className="grid gap-3 sm:grid-cols-3">{actions.map(({ label, icon: Icon, run }) => <button key={label} onClick={run} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><Icon className="h-4 w-4" />{label}</button>)}</div><div className="grid gap-3">{jobRecords.filter((job) => job.type === active || (active === "Parts" && job.status.includes("Parts"))).slice(0, 6).map((job) => <button key={job.number} onClick={() => openJob(job.number)} className="rounded-[8px] border border-slate-200 p-4 text-left hover:border-[#ff8a00]"><p className="font-black">{job.number} - {job.customer}</p><p className="text-sm text-slate-600">{job.device} - {job.status}</p><p className="mt-2 text-sm text-slate-600">{job.next}</p></button>)}{!jobRecords.some((job) => job.type === active || (active === "Parts" && job.status.includes("Parts"))) ? <p className="text-sm text-slate-600">No active {active.toLowerCase()} jobs yet.</p> : null}</div></div>;
   }
 
   return (
@@ -559,12 +632,106 @@ export function OperationsApp({ user }: Props) {
               <button onClick={() => openCommunication()} className="inline-flex h-11 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><Send className="h-4 w-4" /> Contact</button>
             </div></Panel>
             <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-              <Panel title="Job Pipeline"><div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr className="text-xs uppercase text-slate-500"><th className="p-3">Job</th><th className="p-3">Customer</th><th className="p-3">Type</th><th className="p-3">Status</th><th className="p-3">Next</th><th className="p-3">Action</th></tr></thead><tbody>{filteredJobs.map((job) => <tr key={job.number} className="border-t border-slate-100"><td className="p-3 font-black">{job.number}<p className="text-xs font-normal text-slate-500">{job.device}</p></td><td className="p-3">{job.customer}</td><td className="p-3">{job.type}</td><td className="p-3"><Badge>{job.status}</Badge></td><td className="p-3">{job.next}</td><td className="p-3"><button onClick={() => completeJob(job.number)} className="inline-flex items-center gap-1 rounded-[8px] border border-slate-200 px-2 py-1 text-xs font-black"><CheckCircle2 className="h-3 w-3" /> Complete</button></td></tr>)}</tbody></table></div></Panel>
+              <Panel title="Job Pipeline"><div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr className="text-xs uppercase text-slate-500"><th className="p-3">Job</th><th className="p-3">Customer</th><th className="p-3">Type</th><th className="p-3">Status</th><th className="p-3">Next</th><th className="p-3">Action</th></tr></thead><tbody>{filteredJobs.map((job) => <tr key={job.number} className="border-t border-slate-100"><td className="p-3"><button onClick={() => openJob(job.number)} className="text-left font-black text-[#0d1220] hover:text-[#ff8a00]">{job.number}<p className="text-xs font-normal text-slate-500">{job.device}</p></button></td><td className="p-3">{job.customer}</td><td className="p-3">{job.type}</td><td className="p-3"><Badge>{job.status}</Badge></td><td className="p-3">{job.next}</td><td className="p-3"><button onClick={() => completeJob(job.number)} className="inline-flex items-center gap-1 rounded-[8px] border border-slate-200 px-2 py-1 text-xs font-black"><CheckCircle2 className="h-3 w-3" /> Complete</button></td></tr>)}</tbody></table></div></Panel>
               <Panel title="Alerts">{alertMessages.map((alert) => <button key={alert.id} onClick={() => openSection(alert.text.includes("Invoice") ? "Invoices" : alert.text.includes("Quote") ? "Quotes" : "Tasks")} className="mb-3 flex w-full gap-3 rounded-[8px] bg-amber-50 p-3 text-left text-sm font-bold text-amber-900 hover:bg-amber-100"><AlertTriangle className="h-4 w-4 shrink-0" />{alert.text}</button>)}</Panel>
             </div>
           </> : null}
           {active === "Customers" ? <Panel title="Customers"><div className="mb-4 flex justify-end"><button onClick={() => guardedOpen("customer", "customers:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><UserPlus className="h-4 w-4" /> New Customer</button></div><div className="grid gap-3 md:grid-cols-3">{filteredCustomers.map((customer) => <div key={customer.id} className="rounded-[8px] border border-slate-200 p-4"><p className="font-black">{customer.name}</p><p className="text-sm text-slate-600">{customer.phone}</p><p className="text-sm text-slate-600">{customer.email}</p><div className="mt-3 flex flex-wrap gap-2">{customer.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><div className="mt-4 flex gap-2"><button onClick={() => openCommunication(customer.name, "email")} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-xs font-black hover:border-[#ff8a00]"><Mail className="h-4 w-4" /> Email</button><button onClick={() => openCommunication(customer.name, "sms")} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-[8px] border border-slate-200 px-3 text-xs font-black hover:border-[#ff8a00]"><MessageCircle className="h-4 w-4" /> SMS</button></div></div>)}</div></Panel> : null}
-          {active === "Jobs" ? <Panel title="Jobs"><div className="grid gap-3">{filteredJobs.map((job) => <div key={job.number} className="flex flex-col justify-between gap-3 rounded-[8px] border border-slate-200 p-4 md:flex-row"><button onClick={() => showNotice(`${job.number}: ${job.next}`)} className="text-left"><p className="font-black">{job.number} - {job.customer}</p><p className="text-sm text-slate-600">{job.type} - {job.device}</p></button><div className="flex items-center gap-2"><Badge>{job.status}</Badge><button onClick={() => completeJob(job.number)} className="rounded-[8px] border border-slate-200 px-3 py-2 text-xs font-black">Complete</button></div></div>)}</div></Panel> : null}
+          {active === "Jobs" ? <div className="grid gap-6 xl:grid-cols-[0.42fr_0.58fr]">
+            <Panel title="Jobs">
+              <div className="mb-4 flex justify-end">
+                <button onClick={() => guardedOpen("job", "jobs:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><Plus className="h-4 w-4" /> New Job</button>
+              </div>
+              <div className="grid gap-3">
+                {filteredJobs.map((job) => (
+                  <button key={job.number} onClick={() => setSelectedJobNumber(job.number)} className={`rounded-[8px] border p-4 text-left transition hover:border-[#ff8a00] ${selectedJob?.number === job.number ? "border-[#ff8a00] bg-amber-50" : "border-slate-200 bg-white"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-black">{job.number}</p>
+                        <p className="mt-1 text-sm font-bold text-slate-700">{job.customer}</p>
+                      </div>
+                      <Badge>{job.status}</Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-600">{job.type} - {job.device || "No device listed"}</p>
+                    <p className="mt-2 line-clamp-2 text-sm text-slate-500">{job.next}</p>
+                  </button>
+                ))}
+                {!filteredJobs.length ? <p className="text-sm text-slate-600">No jobs match your search.</p> : null}
+              </div>
+            </Panel>
+
+            {selectedJob ? <div className="space-y-6">
+              <Panel title={`${selectedJob.number} Job Detail`}>
+                <div className="mb-5 flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2"><Badge>{selectedJob.status}</Badge><Badge>{selectedJob.type}</Badge>{selectedJob.due ? <Badge>Due {selectedJob.due}</Badge> : null}</div>
+                    <h2 className="mt-3 text-2xl font-black">{selectedJob.customer}</h2>
+                    <p className="mt-1 text-sm text-slate-600">{selectedJob.device || "No device listed"} - {selectedJob.next}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => openCommunication(selectedJob.customer, "email", selectedJob.number)} className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><Mail className="h-4 w-4" /> Email</button>
+                    <button onClick={() => openCommunication(selectedJob.customer, "sms", selectedJob.number)} className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><MessageCircle className="h-4 w-4" /> SMS</button>
+                    <button onClick={() => completeJob(selectedJob.number)} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#ff8a00] px-3 text-sm font-black text-[#0d1220]"><CheckCircle2 className="h-4 w-4" /> Complete</button>
+                  </div>
+                </div>
+
+                <form key={selectedJob.number} action={updateJob} className="grid gap-4 md:grid-cols-2">
+                  <input type="hidden" name="number" defaultValue={selectedJob.number} />
+                  <Field label="Customer"><Select name="customer" defaultValue={selectedJob.customer}>{customerRecords.map((customer) => <option key={customer.id}>{customer.name}</option>)}</Select></Field>
+                  <Field label="Job type"><Select name="type" defaultValue={selectedJob.type}>{settings.jobTypes.map((type) => <option key={type}>{type}</option>)}</Select></Field>
+                  <Field label="Status"><Select name="status" defaultValue={selectedJob.status}>{settings.jobStatuses.map((status) => <option key={status}>{status}</option>)}{settings.jobStatuses.includes(selectedJob.status) ? null : <option>{selectedJob.status}</option>}</Select></Field>
+                  <Field label="Due date"><Input name="due" type="date" defaultValue={selectedJob.due} /></Field>
+                  <Field label="Device / Equipment"><Input name="device" defaultValue={selectedJob.device} placeholder="Laptop, printer, router..." /></Field>
+                  <div className="md:col-span-2"><Field label="Next action / description"><TextArea name="next" defaultValue={selectedJob.next} /></Field></div>
+                  <div className="flex justify-end md:col-span-2"><button disabled={!can(user.role, "jobs:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white disabled:opacity-40"><Save className="h-4 w-4" /> Save Job</button></div>
+                </form>
+              </Panel>
+
+              <div className="grid gap-6 xl:grid-cols-2">
+                <Panel title="Customer Details">
+                  {selectedJobCustomer ? <div className="space-y-3 text-sm">
+                    <div><p className="text-xs font-black uppercase text-slate-500">Name</p><p className="font-bold">{selectedJobCustomer.name}</p></div>
+                    <div><p className="text-xs font-black uppercase text-slate-500">Phone</p><p>{selectedJobCustomer.phone || "Not supplied"}</p></div>
+                    <div><p className="text-xs font-black uppercase text-slate-500">Email</p><p>{selectedJobCustomer.email || "Not supplied"}</p></div>
+                    <div><p className="text-xs font-black uppercase text-slate-500">Area</p><p>{selectedJobCustomer.area || "Not supplied"}</p></div>
+                    <div className="flex flex-wrap gap-2">{selectedJobCustomer.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
+                  </div> : <p className="text-sm text-slate-600">No customer record found for this job yet.</p>}
+                </Panel>
+
+                <Panel title="Related Records">
+                  <div className="grid gap-3 text-sm">
+                    <div><p className="font-black">Quotes</p>{selectedJobQuotes.length ? selectedJobQuotes.map((quote) => <p key={quote.number} className="mt-1 text-slate-600">{quote.number} - {quote.status} - {formatCurrency(calculateTotals(quote.items, settings.gstRegistered).total, settings.currency)}</p>) : <p className="mt-1 text-slate-500">No quotes linked.</p>}</div>
+                    <div><p className="font-black">Invoices</p>{selectedJobInvoices.length ? selectedJobInvoices.map((invoice) => <p key={invoice.number} className="mt-1 text-slate-600">{invoice.number} - {invoice.status} - {formatCurrency(invoice.total - invoice.paid, settings.currency)} owing</p>) : <p className="mt-1 text-slate-500">No invoices linked.</p>}</div>
+                    <div><p className="font-black">Appointments</p>{selectedJobAppointments.length ? selectedJobAppointments.map((appointment) => <p key={`${appointment.time}-${appointment.customer}-${appointment.location}`} className="mt-1 text-slate-600">{appointment.time} - {appointment.type} - {appointment.location}</p>) : <p className="mt-1 text-slate-500">No appointments linked.</p>}</div>
+                  </div>
+                </Panel>
+              </div>
+
+              <Panel title="Job Notes">
+                <form action={addJobNote} className="mb-4 grid gap-3">
+                  <input type="hidden" name="jobNumber" defaultValue={selectedJob.number} />
+                  <Field label="New note"><TextArea name="body" placeholder="Add diagnosis notes, parts info, access details, or internal follow-up..." /></Field>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <Field label="Visibility"><Select name="visibility" defaultValue="Internal"><option>Internal</option><option>Customer</option><option>Technician</option></Select></Field>
+                    <button disabled={!can(user.role, "jobs:write")} className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white disabled:opacity-40"><Save className="h-4 w-4" /> Add Note</button>
+                  </div>
+                </form>
+                <div className="grid gap-3">
+                  {(selectedJob.notes ?? []).length ? (selectedJob.notes ?? []).map((note) => <div key={note.id} className="rounded-[8px] border border-slate-200 bg-slate-50 p-4"><div className="mb-2 flex flex-wrap items-center gap-2"><Badge>{note.visibility}</Badge><span className="text-xs font-bold text-slate-400">{note.createdAt}</span></div><p className="whitespace-pre-wrap text-sm text-slate-700">{note.body}</p></div>) : <p className="text-sm text-slate-600">No notes on this job yet.</p>}
+                </div>
+              </Panel>
+
+              <Panel title="Communications">
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <button onClick={() => openCommunication(selectedJob.customer, "email", selectedJob.number)} className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><Mail className="h-4 w-4" /> Email Customer</button>
+                  <button onClick={() => openCommunication(selectedJob.customer, "sms", selectedJob.number)} className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-slate-200 px-3 text-sm font-black hover:border-[#ff8a00]"><MessageCircle className="h-4 w-4" /> SMS Customer</button>
+                </div>
+                <div className="grid gap-3">
+                  {selectedJobCommunications.length ? selectedJobCommunications.map((message) => <div key={message.id} className="rounded-[8px] border border-slate-200 p-4"><div className="flex flex-col justify-between gap-2 sm:flex-row"><div><p className="font-black">{message.channel.toUpperCase()} to {message.to}</p><p className="text-xs font-bold text-slate-400">{message.createdAt}</p></div><Badge>{message.status}</Badge></div>{message.subject ? <p className="mt-3 text-sm font-bold">{message.subject}</p> : null}<p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{message.body}</p>{message.fallbackUrl ? <a href={message.fallbackUrl} className="mt-3 inline-flex text-xs font-black text-[#ff8a00]">Open fallback sender</a> : null}</div>) : <p className="text-sm text-slate-600">No communications recorded for this job yet.</p>}
+                </div>
+              </Panel>
+            </div> : <Panel title="Job Detail"><p className="text-sm text-slate-600">Select a job to view its full workspace.</p></Panel>}
+          </div> : null}
           {active === "Calendar" ? <Panel title="Calendar"><div className="mb-4 flex justify-end"><button onClick={() => guardedOpen("appointment", "jobs:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><CalendarPlus className="h-4 w-4" /> Book</button></div><div className="grid gap-3 md:grid-cols-3">{appointmentRecords.map((appointment) => <button key={`${appointment.time}-${appointment.customer}-${appointment.location}`} onClick={() => showNotice(`${appointment.customer} at ${appointment.location}`)} className="rounded-[8px] border border-slate-200 p-4 text-left hover:border-[#ff8a00]"><p className="text-sm font-black text-[#ff8a00]">{appointment.time}</p><p className="font-black">{appointment.type}</p><p className="text-sm text-slate-600">{appointment.customer} - {appointment.location}</p></button>)}</div></Panel> : null}
           {active === "Quotes" ? <Panel title="Quotes"><div className="mb-4 flex justify-end"><button onClick={() => guardedOpen("quote", "quotes:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><FilePlus2 className="h-4 w-4" /> New Quote</button></div><div className="grid gap-3">{quoteRecords.map((quote) => <div key={quote.number} className="rounded-[8px] border border-slate-200 p-4"><p className="font-black">{quote.number}</p><p className="text-sm text-slate-600">{quote.customer} - {quote.job} - {quote.status}</p><a className="mt-3 inline-flex rounded-[8px] bg-[#ff8a00] px-3 py-2 text-xs font-black text-[#0d1220]" href={`/q/${quote.token}`}>Open approval link</a></div>)}</div></Panel> : null}
           {active === "Invoices" || active === "Payments" ? <Panel title="Invoices & Payments"><div className="mb-4 flex justify-end"><button onClick={() => guardedOpen("payment", "payments:write")} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#0d1220] px-4 text-sm font-black text-white"><CreditCard className="h-4 w-4" /> Record Payment</button></div><div className="grid gap-3">{invoiceRecords.map((invoice) => <div key={invoice.number} className="flex justify-between rounded-[8px] border border-slate-200 p-4"><button onClick={() => showNotice(`${invoice.number} status: ${invoice.status}`)} className="text-left"><p className="font-black">{invoice.number}</p><p className="text-sm text-slate-600">{invoice.customer}</p></button><p className="font-black">{formatCurrency(invoice.total - invoice.paid, settings.currency)}</p></div>)}</div></Panel> : null}
@@ -614,6 +781,8 @@ export function OperationsApp({ user }: Props) {
               <div className="md:col-span-2"><Field label="Detail"><Input name="detail" defaultValue={`Draft operating workflow for ${active}.`} /></Field></div>
             </> : null}
             {modal === "communication" ? <>
+              {communicationDraft.jobNumber ? <div className="md:col-span-2 rounded-[8px] bg-amber-50 p-3 text-sm font-bold text-amber-900">Linked to job {communicationDraft.jobNumber}</div> : null}
+              <input name="jobNumber" type="hidden" defaultValue={communicationDraft.jobNumber ?? ""} />
               <Field label="Customer"><Select name="customer" value={communicationDraft.customer} onChange={(event) => updateCommunicationCustomer(event.target.value)}>{customerRecords.map((customer) => <option key={customer.id}>{customer.name}</option>)}</Select></Field>
               <Field label="Channel"><Select name="channel" value={communicationDraft.channel} onChange={(event) => updateCommunicationChannel(event.target.value === "sms" ? "sms" : "email")}><option value="email">Email</option><option value="sms">SMS</option></Select></Field>
               <div className="md:col-span-2"><Field label="Template"><Select name="templateId" value={communicationDraft.templateId} onChange={(event) => applyCommunicationTemplate(event.target.value)}><option value="">Blank message</option>{settings.communicationTemplates.filter((template) => template.channel === communicationDraft.channel).map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</Select></Field></div>
