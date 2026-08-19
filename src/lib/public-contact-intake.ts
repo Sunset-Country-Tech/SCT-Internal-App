@@ -77,6 +77,10 @@ export function verifyPublicIntakeSecret(provided: string | null, expected: stri
   return timingSafeEqual(providedHash, expectedHash);
 }
 
+export function publicIntakeSecretFromEnv(env: Record<string, string | undefined> = process.env) {
+  return env.SCT_PUBLIC_INTAKE_SECRET || env.PUBLIC_INTAKE_SECRET;
+}
+
 export function parsePublicContactFormData(formData: FormData) {
   const parsed = publicContactIntakeSchema.safeParse({
     name: formData.get("name"),

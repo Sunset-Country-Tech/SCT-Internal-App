@@ -5,6 +5,7 @@ import {
   createPublicContactIntake,
   parsePublicContactFormData,
   PublicContactIntakeError,
+  publicIntakeSecretFromEnv,
   type PublicContactCustomer,
   type PublicContactIntakeRepository,
 } from "../src/lib/public-contact-intake";
@@ -99,6 +100,18 @@ test("invalid shared public intake secret is rejected", async () => {
 
   assert.equal(response.status, 401);
   assert.deepEqual(body, { ok: false, message: "Contact intake is not available." });
+});
+
+test("public intake secret supports SCT env alias", () => {
+  assert.equal(publicIntakeSecretFromEnv({ SCT_PUBLIC_INTAKE_SECRET: "alias-secret" }), "alias-secret");
+  assert.equal(publicIntakeSecretFromEnv({ PUBLIC_INTAKE_SECRET: "primary-secret" }), "primary-secret");
+  assert.equal(
+    publicIntakeSecretFromEnv({
+      PUBLIC_INTAKE_SECRET: "docker-dev-public-intake-secret",
+      SCT_PUBLIC_INTAKE_SECRET: "production-secret",
+    }),
+    "production-secret",
+  );
 });
 
 test("honeypot spam is rejected", () => {

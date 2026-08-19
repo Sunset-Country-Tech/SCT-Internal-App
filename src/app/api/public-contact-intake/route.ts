@@ -5,6 +5,7 @@ import {
   getSourceIp,
   parsePublicContactFormData,
   PublicContactIntakeError,
+  publicIntakeSecretFromEnv,
   verifyPublicIntakeSecret,
   type PublicContactIntakeRepository,
 } from "@/lib/public-contact-intake";
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     return jsonError("Too many contact enquiries. Please try again later.", 429);
   }
 
-  if (!verifyPublicIntakeSecret(request.headers.get("x-sct-public-intake-secret"), process.env.PUBLIC_INTAKE_SECRET)) {
+  if (!verifyPublicIntakeSecret(request.headers.get("x-sct-public-intake-secret"), publicIntakeSecretFromEnv())) {
     return jsonError("Contact intake is not available.", 401);
   }
 
